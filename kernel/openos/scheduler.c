@@ -62,7 +62,7 @@ void scheduler_start() {
       
       
       if (isSlotSerialRx() == 1) {
-         board_sleep();
+         board_deep_sleep();
       } else {
           board_sleep();
       }
