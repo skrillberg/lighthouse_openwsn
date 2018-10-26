@@ -113,9 +113,9 @@ void sixtop_init() {
     sixtop_vars.ebSendingTimerId   = opentimers_create();
     opentimers_scheduleIn(
         sixtop_vars.ebSendingTimerId,
-        sixtop_vars.periodMaintenance,
+        SLOTFRAME_LENGTH*10,
         TIME_MS,
-        TIMER_ONESHOT,
+        TIMER_PERIODIC,
         sixtop_sendingEb_timer_cb
     );
     
@@ -609,6 +609,7 @@ owerror_t sixtop_send_internal(
 void sixtop_sendingEb_timer_cb(opentimers_id_t id){
     scheduler_push_task(timer_sixtop_sendEb_fired,TASKPRIO_SIXTOP);
     // update the period
+    /*
     sixtop_vars.periodMaintenance  = 872 +(openrandom_get16b()&0xff);
     opentimers_scheduleIn(
         sixtop_vars.ebSendingTimerId,
@@ -616,7 +617,7 @@ void sixtop_sendingEb_timer_cb(opentimers_id_t id){
         TIME_MS,
         TIMER_ONESHOT,
         sixtop_sendingEb_timer_cb
-    );
+    );*/
 }
 
 void sixtop_maintenance_timer_cb(opentimers_id_t id) {
@@ -629,10 +630,18 @@ void sixtop_timeout_timer_cb(opentimers_id_t id) {
 
 //======= EB/KA task
 
-void timer_sixtop_sendEb_fired(){
+void timer_sixtop_sendEb_fired(void) {
     
     uint16_t newPeriod;
+
+    // send EBs on a portion of the minimal cells not exceeding 1/(3(N+1))
+    // https://tools.ietf.org/html/draft-chang-6tisch-msf-01#section-2
+    if(openrandom_get16b()<0xffff/(3*(neighbors_getNumNeighbors()+1))){
+        sixtop_sendEB();
+    }
+
     // current period 
+    /*
     newPeriod = EB_PORTION*(neighbors_getNumNeighbors()+1);
     if (
         sixtop_vars.ebPeriod  < newPeriod &&
@@ -651,9 +660,8 @@ void timer_sixtop_sendEb_fired(){
         default:
             break;
         }
-    }
+    }*/
 }
-
 /**
 \brief Timer handlers which triggers MAC management task.
 
