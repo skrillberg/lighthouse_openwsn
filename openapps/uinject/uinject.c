@@ -127,17 +127,17 @@ void imu_int_cb(void){
    IMUData data;
    mimsyIMURead6Dof(&data);
 
-   if(debounce == 0){
+   if(debounce == 0 || debounce ==1){
        debounce = 1;
        triggered = 1;
        scheduler_push_task(uinject_task_cb,TASKPRIO_COAP);
-       opentimers_scheduleIn(
+       /*opentimers_scheduleIn(
             uinject_vars.debounceTimerId,
             1000,
             TIME_MS,
             TIMER_ONESHOT,
             debounce_timer_cb
-        );
+        );*/
        SCHEDULER_WAKEUP();
     }
 }
