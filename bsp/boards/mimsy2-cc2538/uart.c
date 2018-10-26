@@ -48,7 +48,9 @@ static void uart_isr_private(void);
 void uart_init() { 
    // reset local variables
    memset(&uart_vars,0,sizeof(uart_vars_t));
-   
+
+     // Enable UART hardware
+   UARTEnable(UART0_BASE); 
    // Disable UART function
    UARTDisable(UART0_BASE);
 

@@ -9,7 +9,7 @@
 #include "board.h"
 #include "debugpins.h"
 #include "leds.h"
-#include "/home/vagrant/openwsn-May19/openwsn-fw/openstack/02b-MAChigh/schedule.h"
+#include "/home/vagrant/openwsn-craig/owIMU/openstack/02b-MAChigh/schedule.h"
 
 //=========================== variables =======================================
 
@@ -62,7 +62,7 @@ void scheduler_start() {
       
       
       if (isSlotSerialRx() == 1) {
-         board_deep_sleep();
+         board_sleep();
       } else {
           board_sleep();
       }

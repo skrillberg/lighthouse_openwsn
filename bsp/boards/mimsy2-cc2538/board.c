@@ -29,8 +29,6 @@
 #include "cryptoengine.h"
 #include "uart_mimsy.h"
 
-
-
 //=========================== variables =======================================
 
 #define BSP_BUTTON_BASE                 ( GPIO_C_BASE )
@@ -77,7 +75,7 @@ void board_init(void) {
    clock_init();
    board_timer_init(); //changed for inchwrom code
    leds_init(); //changed for incworm code
-   debugpins_init(); //changed for inchworm code
+  // debugpins_init(); //changed for inchworm code
    //button_init();
    sctimer_init(); //changed for inchworm code
    uart_init(); //changed for inchwrom code
@@ -85,10 +83,6 @@ void board_init(void) {
    i2c_init(); //changed for inchworm code
   // sensors_init();
   // cryptoengine_init();
-
-
-
-   
 }
 
 /**
@@ -100,8 +94,8 @@ void board_sleep(void) {
 }
 
 void board_deep_sleep(void) {
-  SysCtrlPowerModeSet(SYS_CTRL_PM_2);
-  SysCtrlDeepSleep();
+    SysCtrlPowerModeSet(SYS_CTRL_PM_2);
+    SysCtrlDeepSleep();
 }
 
 /**

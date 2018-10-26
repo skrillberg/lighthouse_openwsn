@@ -138,10 +138,9 @@ void i2c_write_register_8bit( uint8_t slave_addr,uint8_t reg_addr, uint8_t data)
 }
 
 int i2c_write_registers( uint8_t slave_addr,uint8_t reg_addr, uint8_t length,uint8_t *data){
-  int i = 0;
   uint8_t buffer[100] ;
   buffer[0]=reg_addr;
-  for(i = 0; i < length+1; i++){
+  for(int i = 0; i < length+1; i++){
     buffer[i+1]=*data;
     data++; 
   }

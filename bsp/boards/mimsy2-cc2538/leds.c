@@ -46,13 +46,14 @@ void leds_init() {
 
 // red
 void    leds_error_on() {
-	bspLedSet(BSP_LED_1);
+	//bspLedSet(BSP_LED_1);
 }
 void    leds_error_off() {
 	bspLedClear(BSP_LED_1);
 }
 void    leds_error_toggle() {
-	bspLedToggle(BSP_LED_1);
+	//bspLedToggle(BSP_LED_1);
+    bspLedClear(BSP_LED_1);
 }
 uint8_t leds_error_isOn() {
 	  uint32_t ui32Toggle = GPIOPinRead(BSP_LED_BASE, BSP_LED_1);
@@ -106,13 +107,13 @@ uint8_t leds_debug_isOn() {
 
 // all
 void leds_all_on() {
-	bspLedSet(BSP_LED_ALL);
+	//bspLedSet(BSP_LED_ALL);
 }
 void leds_all_off() {
 	bspLedClear(BSP_LED_ALL);
 }
 void leds_all_toggle() {
-	bspLedToggle(BSP_LED_ALL);
+	//bspLedToggle(BSP_LED_ALL);
 }
 
 void leds_error_blink() {

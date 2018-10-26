@@ -29,7 +29,7 @@
       which page the data was written to and which timestamps on the data are included
  */
 void flashWriteIMU(IMUData data[],uint32_t size, uint32_t startPage,int wordsWritten){
-  uint32_t i = 0;
+
   uint32_t pageStartAddr=FLASH_BASE + (startPage * PAGE_SIZE); //page base address
   int32_t i32Res;
 
@@ -40,7 +40,7 @@ void flashWriteIMU(IMUData data[],uint32_t size, uint32_t startPage,int wordsWri
 	  i32Res = FlashMainPageErase(pageStartAddr); //erase page so there it can be written to
   }
   //mimsyPrintf("\n Flash Erase Status: %d",i32Res);
-  for(i=0;i<size;i++ ){
+  for(uint32_t i=0;i<size;i++ ){
       uint32_t* wordified_data=data[i].bits; //retrieves the int32 array representation of the IMUData struct
      IntMasterDisable(); //disables interrupts to prevent the write operation from being messed up
       i32Res = FlashMainPageProgram(wordified_data,pageStartAddr+i*IMU_DATA_STRUCT_SIZE+wordsWritten*4,IMU_DATA_STRUCT_SIZE); //write struct to flash
@@ -61,12 +61,11 @@ void flashWriteIMU(IMUData data[],uint32_t size, uint32_t startPage,int wordsWri
     uint32_t size: size of dataArray in number of IMUData structures
 */
 void flashReadIMU(IMUDataCard card, IMUData * dataArray,uint32_t size){
-  uint32_t i = 0;
-  uint32_t j = 0;
+  
   uint32_t pageAddr=FLASH_BASE+card.page*PAGE_SIZE;
 
-  for(i=0;i<size;i++){
-    for(j=0;j<IMU_DATA_STRUCT_SIZE/4;j++){
+  for(uint32_t i=0;i<size;i++){
+    for(uint32_t j=0;j<IMU_DATA_STRUCT_SIZE/4;j++){
        IntMasterDisable();
     dataArray[i].bits[j]=FlashGet(pageAddr+i*IMU_DATA_STRUCT_SIZE+j*4);
      IntMasterEnable();
@@ -82,12 +81,11 @@ void flashReadIMU(IMUDataCard card, IMUData * dataArray,uint32_t size){
     uint32_t size: size of dataArray in number of IMUData structures
 */
 void flashReadIMUSection(IMUDataCard card, IMUData * dataArray,uint32_t size, int wordsRead){
-  uint32_t i = 0;
-  uint32_t j = 0;
+
   uint32_t pageAddr=FLASH_BASE+card.page*PAGE_SIZE;
 
-  for(i=0;i<size;i++){
-    for(j=0;j<IMU_DATA_STRUCT_SIZE/4;j++){
+  for(uint32_t i=0;i<size;i++){
+    for(uint32_t j=0;j<IMU_DATA_STRUCT_SIZE/4;j++){
        IntMasterDisable();
     dataArray[i].bits[j]=FlashGet(pageAddr+i*IMU_DATA_STRUCT_SIZE+j*4+wordsRead*4);
      IntMasterEnable();

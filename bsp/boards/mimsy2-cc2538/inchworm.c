@@ -58,8 +58,7 @@ PwmTimerAIntHandler(void)
     
     
     //optimize this for loop, it think it will be a bit much
-     uint32_t i = 0;
-    for(i=0;i<motorsNum;i++){
+    for(uint8_t i=0;i<motorsNum;i++){
       if(activeDriveList[i]){
         stepCountList[i]=stepCountList[i]+2;
         if(stepCountList[i]>=stepTargetList[i]){
@@ -106,8 +105,7 @@ void inchwormInit(struct InchwormSetup setup){
   //setup active motors list
   motorsNum=setup.numOfMotors;
   
-  uint32_t i = 0;
-  for(i=0;i<motorsNum;i++){
+  for(uint8_t i=0;i<motorsNum;i++){
     activeDriveList[i]=false;
     motorList[i]=setup.iwMotors[i];
     stepCountList[i]=0;
@@ -206,7 +204,7 @@ void inchwormInit(struct InchwormSetup setup){
     
     //set output pins for pwm//////////////////////////////
     
-    for(i=0;i<setup.numOfMotors;i++){
+    for(uint8_t i=0;i<setup.numOfMotors;i++){
   
     IOCPinConfigPeriphOutput(setup.iwMotors[i].GPIObase1,setup.iwMotors[i].GPIOpin1,IOC_MUX_OUT_SEL_GPT3_ICP1); //maps pwm1 output to pin1
     IOCPinConfigPeriphOutput(setup.iwMotors[i].GPIObase2,setup.iwMotors[i].GPIOpin2,IOC_MUX_OUT_SEL_GPT3_ICP2); //maps pwm2 output to pin2
