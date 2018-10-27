@@ -30,7 +30,7 @@ static const uint8_t uinject_dst_addr[]   = {
 void uinject_timer_cb(opentimers_id_t id);
 void uinject_task_cb(void);
 void imu_int_cb(void);
-void debounce_timer_cb(void);
+void debounce_timer_cb(opentimers_id_t id);
 
 //=========================== public ==========================================
 
@@ -90,6 +90,14 @@ void uinject_init(void) {
         TIMER_PERIODIC,
         uinject_timer_cb
     );
+    /*
+    opentimers_scheduleIn(
+            uinject_vars.debounceTimerId,
+            2000,
+            TIME_MS,
+            TIMER_PERIODIC,
+            debounce_timer_cb
+    );*/
 
     uinject_vars.debounceTimerId = opentimers_create();
 
@@ -127,22 +135,22 @@ void imu_int_cb(void){
    IMUData data;
    mimsyIMURead6Dof(&data);
 
-   if(debounce == 0 || debounce ==1){
+   if(debounce == 0 ){
        debounce = 1;
        triggered = 1;
        scheduler_push_task(uinject_task_cb,TASKPRIO_COAP);
-       /*opentimers_scheduleIn(
+       opentimers_scheduleIn(
             uinject_vars.debounceTimerId,
             1000,
             TIME_MS,
             TIMER_ONESHOT,
             debounce_timer_cb
-        );*/
+        );
        SCHEDULER_WAKEUP();
     }
 }
 
-void debounce_timer_cb(void){
+void debounce_timer_cb(opentimers_id_t id){
     debounce = 0;
 }
 
