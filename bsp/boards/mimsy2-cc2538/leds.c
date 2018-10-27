@@ -47,6 +47,7 @@ void leds_init() {
 // red
 void    leds_error_on() {
 	//bspLedSet(BSP_LED_1);
+	bspLedClear(BSP_LED_1);
 }
 void    leds_error_off() {
 	bspLedClear(BSP_LED_1);
@@ -81,6 +82,7 @@ void    leds_radio_on() {
 }
 void    leds_radio_off() {
 	bspLedClear(BSP_LED_4);
+	bspLedClear(BSP_LED_1);
 }
 void    leds_radio_toggle() {
 	bspLedToggle(BSP_LED_4);

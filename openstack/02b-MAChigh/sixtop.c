@@ -113,7 +113,7 @@ void sixtop_init() {
     sixtop_vars.ebSendingTimerId   = opentimers_create();
     opentimers_scheduleIn(
         sixtop_vars.ebSendingTimerId,
-        SLOTFRAME_LENGTH*10,
+        SLOTFRAME_LENGTH*15,
         TIME_MS,
         TIMER_PERIODIC,
         sixtop_sendingEb_timer_cb

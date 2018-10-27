@@ -11,13 +11,15 @@
 #include "headers/hw_gpio.h"
 #include <headers/hw_memmap.h>
 #include "flash_mimsy.h"
-
+#include "headers/hw_ints.h"
+#include "inv_mpu.h"
 //=========================== variables =======================================
 
 uinject_vars_t uinject_vars;
-uint8_t triggered;
-uint8_t debounce;
+volatile uint8_t triggered;
+volatile uint8_t debounce;
 uint8_t me;
+volatile 
 
 static const uint8_t uinject_payload[]    = "uinject";
 static const uint8_t uinject_dst_addr[]   = {
@@ -36,8 +38,10 @@ void debounce_timer_cb(opentimers_id_t id);
 
 void uinject_init(void) {
     me = (uint8_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7]);	
-    mimsyIMUInit();
-    mpu_lp_accel_mode(1);
+    //mimsyIMUInit();
+    struct int_param_s placeholder;
+    mpu_init(&placeholder);
+    //mpu_lp_accel_mode(1);
     mpu_lp_motion_interrupt(100, 300,20);
 
     triggered = 0;
@@ -63,11 +67,11 @@ void uinject_init(void) {
 
     // clear pin
     GPIOPinIntClear(GPIO_A_BASE, GPIO_PIN_7);
-   // IntPrioritySet(GPIO_A_BASE, 1<<5);
+    IntPrioritySet(INT_GPIOA, 6<<5);
     // enable the interrupt (unmasks the interrupt bit)
     GPIOPinIntEnable(GPIO_A_BASE, GPIO_PIN_7);
 
-    ENABLE_INTERRUPTS();
+    //ENABLE_INTERRUPTS();
 
     // 
     
@@ -90,16 +94,18 @@ void uinject_init(void) {
         TIMER_PERIODIC,
         uinject_timer_cb
     );
-    /*
+    
+
+
+    uinject_vars.debounceTimerId = opentimers_create();
+
     opentimers_scheduleIn(
             uinject_vars.debounceTimerId,
-            2000,
+            10000,
             TIME_MS,
             TIMER_PERIODIC,
             debounce_timer_cb
-    );*/
-
-    uinject_vars.debounceTimerId = opentimers_create();
+    );
 
 }
 
@@ -134,20 +140,21 @@ void imu_int_cb(void){
    GPIOPinIntClear(GPIO_A_BASE, GPIO_PIN_7);
    IMUData data;
    mimsyIMURead6Dof(&data);
-
-   if(debounce == 0 ){
+   
+   //if(debounce == 0 || debounce == 1){
        debounce = 1;
        triggered = 1;
        scheduler_push_task(uinject_task_cb,TASKPRIO_COAP);
+        /*
        opentimers_scheduleIn(
             uinject_vars.debounceTimerId,
             1000,
             TIME_MS,
             TIMER_ONESHOT,
             debounce_timer_cb
-        );
-       SCHEDULER_WAKEUP();
-    }
+        );*/
+       //SCHEDULER_WAKEUP();
+    //}
 }
 
 void debounce_timer_cb(opentimers_id_t id){
