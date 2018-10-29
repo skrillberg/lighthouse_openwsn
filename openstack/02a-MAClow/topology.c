@@ -2,6 +2,7 @@
 #include "topology.h"
 #include "idmanager.h"
 
+#define FORCETOPOLOGY 
 //=========================== defines =========================================
 
 //=========================== variables =======================================
@@ -56,28 +57,47 @@ bool topology_isAcceptablePacket(ieee802154_header_iht* ieee802514_header) {
    
    returnVal=FALSE;
    switch (idmanager_getMyID(ADDR_64B)->addr_64b[7]) {
-      case 0xdf:
+      case 0xc2:
          if (
-               ieee802514_header->src.addr_64b[7]==0x66
+               ieee802514_header->src.addr_64b[7]==0xe2
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x66:
+      case 0x2f:
          if (
-               ieee802514_header->src.addr_64b[7]==0xdf ||
-               ieee802514_header->src.addr_64b[7]==0x4f
+               ieee802514_header->src.addr_64b[7]==0xe2 
             ) {
             returnVal=TRUE;
          }
          break;
-      case 0x4f:
+      case 0xd5:
          if (
-               ieee802514_header->src.addr_64b[7]==0x66
+               ieee802514_header->src.addr_64b[7]==0xe2
             ) {
             returnVal=TRUE;
          }
          break;   
+
+      case 0xe2:
+         if (
+               ieee802514_header->src.addr_64b[7]==0xc2 ||
+               ieee802514_header->src.addr_64b[7]==0x2f ||
+               ieee802514_header->src.addr_64b[7]==0xb2 ||
+               ieee802514_header->src.addr_64b[7]==0xd5 
+            ) {
+            returnVal=TRUE;
+         }
+         break; 
+  
+      case 0xb2:
+         if (
+               ieee802514_header->src.addr_64b[7]==0xe2
+            ) {
+            returnVal=TRUE;
+         }
+         break;   
+
    }
    return returnVal;
 #else

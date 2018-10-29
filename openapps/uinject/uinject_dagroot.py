@@ -223,7 +223,7 @@ class moteProbe(threading.Thread):
                                             if counter-self.last_counter!=1:
                                                 print 'MISSING {0} packets!!'.format(counter-self.last_counter-1)
                                         self.last_counter = counter
-                                        print "{0:^7} {1:^15} {2}".format(counter, self.SLOT_DURATION*((asn_inital[0]-asn_arrive[0])+(asn_inital[1]-asn_arrive[1])*256+(asn_inital[2]-asn_arrive[2])*65536),mote_id)
+                                        print "{0:^7} {1:^15} {2:02x}".format(counter, self.SLOT_DURATION*((asn_inital[0]-asn_arrive[0])+(asn_inital[1]-asn_arrive[1])*256+(asn_inital[2]-asn_arrive[2])*65536),mote_id)
 
                                         self.writer.writerow({'triggered': counter,'asn_sent':self.SLOT_DURATION*(asn_inital[0]+asn_inital[1]*256 + asn_inital[2]*65536),'latency' :  self.SLOT_DURATION*((asn_inital[0]-asn_arrive[0])+(asn_inital[1]-asn_arrive[1])*256+(asn_inital[2]-asn_arrive[2])*65536), 'mote_id' : mote_id })   
                                         self.f.flush()
