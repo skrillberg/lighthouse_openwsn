@@ -21,7 +21,6 @@
 
 // in seconds: sixtop maintaince is called every 30 seconds
 #define MAINTENANCE_PERIOD        30
-
 //=========================== variables =======================================
 
 sixtop_vars_t sixtop_vars;
@@ -741,6 +740,38 @@ port_INLINE void sixtop_sendEB() {
     eb->creator = COMPONENT_SIXTOP;
     eb->owner   = COMPONENT_SIXTOP;
     
+
+    //reserve space for location IE. This should be before all other reserve
+    //header operation because otherwise it will not be appended to the end of the IEs
+
+    uint16_t loc_len = 8;
+    packetfunctions_reserveHeaderSize(eb,loc_len); //undid to get working
+    temp16b = IEEE802154E_DESC_TYPE_SHORT | 
+              (0x39 << IEEE802154E_DESC_SUBID_SHORT_MLME_IE_SHIFT) | 
+               (loc_len-2) ;
+  //printf("%d \n",temp16b);
+    uint8_t loc_stream[8] = {(uint8_t)(temp16b & 0x00ff),
+                             (uint8_t)((temp16b & 0xff00)>>8),
+
+                             (uint8_t)(sixtop_vars.location.x & 0x00ff),
+			     (uint8_t)((sixtop_vars.location.x & 0xff00)>>8),
+
+                             (uint8_t)(sixtop_vars.location.y & 0x00ff), 
+			     (uint8_t)((sixtop_vars.location.y & 0xff00)>>8),
+
+                             (uint8_t)(sixtop_vars.location.z & 0x00ff), 
+			     (uint8_t)((sixtop_vars.location.z & 0xff00)>>8)  };
+  //printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \n");
+  //printf("%x, %x \n",(uint8_t)(temp16b & 0x00ff),(uint8_t)((temp16b & 0xff00)>>8));
+
+    //load location header
+    for (i=0;i<loc_len;i++){
+        eb->payload[i]   = loc_stream[i]; //undid to get working
+	  //printf("%x\n",eb->payload[i]);
+    }
+  //printf("\n");
+
+    //uint16_t loc_len = 0;
     // in case we none default number of shared cells defined in minimal configuration
     if (ebIEsBytestream[EB_SLOTFRAME_NUMLINK_OFFSET]>1){
         for (i=ebIEsBytestream[EB_SLOTFRAME_NUMLINK_OFFSET]-1;i>0;i--){
@@ -758,15 +789,23 @@ port_INLINE void sixtop_sendEB() {
     for (i=0;i<EB_IE_LEN;i++){
         eb->payload[i]   = ebIEsBytestream[i];
     }
-    
+    //loc_len = 0; //undid to fix things
     if (ebIEsBytestream[EB_SLOTFRAME_NUMLINK_OFFSET]>1){
         // reconstruct the MLME IE header since length changed 
-        eb_len = EB_IE_LEN-2+5*(ebIEsBytestream[EB_SLOTFRAME_NUMLINK_OFFSET]-1);
+        eb_len = EB_IE_LEN-2+5*(ebIEsBytestream[EB_SLOTFRAME_NUMLINK_OFFSET]-1)+loc_len;
+        temp16b = eb_len | IEEE802154E_PAYLOAD_DESC_GROUP_ID_MLME | IEEE802154E_PAYLOAD_DESC_TYPE_MLME;
+        eb->payload[0] = (uint8_t)(temp16b & 0x00ff);
+        eb->payload[1] = (uint8_t)((temp16b & 0xff00)>>8);
+    }else{
+    
+
+        //modify mlme length to include experimental location ie 
+        eb_len = EB_IE_LEN-2 + loc_len;
         temp16b = eb_len | IEEE802154E_PAYLOAD_DESC_GROUP_ID_MLME | IEEE802154E_PAYLOAD_DESC_TYPE_MLME;
         eb->payload[0] = (uint8_t)(temp16b & 0x00ff);
         eb->payload[1] = (uint8_t)((temp16b & 0xff00)>>8);
     }
-    
+
     // Keep a pointer to where the ASN will be
     // Note: the actual value of the current ASN and JP will be written by the
     //    IEEE802.15.4e when transmitting

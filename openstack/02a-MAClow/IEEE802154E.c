@@ -17,6 +17,7 @@
 #include "sctimer.h"
 #include "openrandom.h"
 
+/*
 #include <headers/hw_memmap.h>
 #include <headers/hw_types.h>
 
@@ -36,9 +37,9 @@
 #include <source/sys_ctrl.h>
 #include <source/sleepmode.h>
 #include <headers/hw_ints.h>
-
+*/
 #include "board.h"
-#include "leds.h"
+//#include "leds.h"
 
 //=========================== variables =======================================
 
@@ -321,8 +322,8 @@ void isr_ieee154e_newSlot(opentimers_id_t id) {
         adaptive_sync_countCompensationTimeout();
 #endif
         //since I'm syncrhonized, turn all lights on;
-        GPIOPinWrite(GPIO_C_BASE, GPIO_PIN_4, GPIO_PIN_4);
-        GPIOPinWrite(GPIO_C_BASE, GPIO_PIN_7, GPIO_PIN_7);
+        //GPIOPinWrite(GPIO_C_BASE, GPIO_PIN_4, GPIO_PIN_4); //modified so sim works
+        //GPIOPinWrite(GPIO_C_BASE, GPIO_PIN_7, GPIO_PIN_7);
 
         activity_ti1ORri1();
     }
@@ -490,6 +491,7 @@ void ieee154e_endOfFrame(PORT_TIMER_WIDTH capturedTime) {
             break;
       }
    }
+   
    ieee154e_dbg.num_endOfFrame++;
 }
 
@@ -675,7 +677,7 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
      does not get executed. This indicates the received packet is correct.
    */
    do { // this "loop" is only executed once
-      
+    //printf("beginning of do loop \n");
       // retrieve the received data frame from the radio's Rx buffer
       ieee154e_vars.dataReceived->payload = &(ieee154e_vars.dataReceived->packet[FIRST_FRAME_BYTE]);
       radio_getReceivedFrame(       ieee154e_vars.dataReceived->payload,
@@ -691,6 +693,7 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
           openserial_printError(COMPONENT_IEEE802154E,ERR_INVALIDPACKETFROMRADIO,
                             (errorparameter_t)0,
                             ieee154e_vars.dataReceived->length);
+      //printf("break because packet is too short \n");
          break;
       }
       
@@ -700,15 +703,17 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
       // break if invalid CRC
       if (ieee154e_vars.dataReceived->l1_crc==FALSE) {
          // break from the do-while loop and execute abort code below
+       //printf("break if invalid crc \n");
          break;
       }
       
       // parse the IEEE802.15.4 header (synchronize, end of frame)
       ieee802154_retrieveHeader(ieee154e_vars.dataReceived,&ieee802514_header);
-      
+    //printf("retrieved header\n");
       // break if invalid IEEE802.15.4 header
       if (ieee802514_header.valid==FALSE) {
          // break from the do-while loop and execute the clean-up code below
+       //printf("break because invalid header\n");
          break;
       }
       
@@ -719,13 +724,14 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
 
       // verify that incoming security level is acceptable
       if (IEEE802154_security_acceptableLevel(ieee154e_vars.dataReceived, &ieee802514_header) == FALSE) {
+          //printf("security unaccepatble\n");
             break;
       }
-
+      //printf("before data received if statement\n");
       if (ieee154e_vars.dataReceived->l2_securityLevel != IEEE154_ASH_SLF_TYPE_NOSEC) {
          // If we are not synced, we need to parse IEs and retrieve the ASN
          // before authenticating the beacon, because nonce is created from the ASN
-         if (!ieee154e_vars.isSync && ieee802514_header.frameType == IEEE154_TYPE_BEACON) {
+         if (!ieee154e_vars.isSync && ieee802514_header.frameType == IEEE154_TYPE_BEACON) {       //printf("before is valid join");
             if (!isValidJoin(ieee154e_vars.dataReceived, &ieee802514_header)) {
                break;
             }
@@ -741,6 +747,9 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
      
       // process IEs
       lenIE = 0;
+                       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)7,
+                            (errorparameter_t)1);
       if (
             (
                ieee802514_header.valid==TRUE                                                       &&
@@ -749,10 +758,15 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
                packetfunctions_sameAddress(&ieee802514_header.panid,idmanager_getMyID(ADDR_PANID)) &&
                ieee154e_processIEs(ieee154e_vars.dataReceived,&lenIE)
             )==FALSE) {
+                       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)5,
+                            (errorparameter_t)1);
          // break from the do-while loop and execute the clean-up code below
          break;
       }
-    
+      //printf("process IEs\n");
+     //printf("me: %x\n",idmanager_getMyID(ADDR_PANID));
+        ieee154e_processIEs(ieee154e_vars.dataReceived,&lenIE);
       // turn off the radio
       radio_rfOff();
       
@@ -780,7 +794,7 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
       
       // official end of synchronization
       endSlot();
-      
+    //printf("finished do loop\n");
       // everything went well, return here not to execute the error code below
       return;
       
@@ -798,12 +812,17 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
 
 port_INLINE bool ieee154e_processIEs(OpenQueueEntry_t* pkt, uint16_t* lenIE) {
     uint8_t i;
+                       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)4,
+                            (errorparameter_t)1);
     if (isValidEbFormat(pkt,lenIE)==TRUE){
         // at this point, ASN and frame length are known
         // the current slotoffset can be inferred
+      //printf("isvalidebformat\n");
         ieee154e_syncSlotOffset();
         schedule_syncSlotOffset(ieee154e_vars.slotOffset);
         ieee154e_vars.nextActiveSlotOffset = schedule_getNextActiveSlotOffset();
+      //printf("after offset calls\n");
         /* 
         infer the asnOffset based on the fact that
         ieee154e_vars.freq = 11 + (asnOffset + channelOffset)%16 
@@ -817,6 +836,7 @@ port_INLINE bool ieee154e_processIEs(OpenQueueEntry_t* pkt, uint16_t* lenIE) {
         return TRUE;
     } else {
         // wrong eb format
+      //printf("wrongeb format\n");
         openserial_printError(COMPONENT_IEEE802154E,ERR_UNSUPPORTED_FORMAT,3,0);
         return FALSE;
     }
@@ -1837,6 +1857,9 @@ port_INLINE void activity_ri5(PORT_TIMER_WIDTH capturedTime) {
         ) {
             if (ieee154e_processIEs(ieee154e_vars.dataReceived,&lenIE)==FALSE){
                 // retrieve EB IE failed, break the do-while loop and execute the clean up code below
+                       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)6,
+                            (errorparameter_t)1);
                 break;
             }
         }
@@ -2297,7 +2320,7 @@ port_INLINE void joinPriorityStoreFromEB(uint8_t jp){
 // This way, we can authenticate EBs and reject unwanted ones.
 bool isValidJoin(OpenQueueEntry_t* eb, ieee802154_header_iht *parsedHeader) {
    uint16_t              lenIE;
-
+  //printf("isvaildjoin");
    // toss the header in order to get to IEs
    packetfunctions_tossHeader(eb, parsedHeader->headerLength);
      
@@ -2340,7 +2363,8 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
     bool    tsTemplate_checkpass;
     bool    sync_ie_checkPass;
     bool    slotframelink_ie_checkPass;
-    
+    bool    location_checkPass; //turns true when the location is changed     
+
     uint8_t ptr;
     uint16_t temp16b;
     bool    mlme_ie_found;
@@ -2357,17 +2381,22 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
     open_addr_t temp_neighbor;
     uint16_t slotoffset;
     uint16_t channeloffset;
-    
+    int16_t x;
+    int16_t y;
+    int16_t z;
     chTemplate_checkPass        = FALSE;
     tsTemplate_checkpass        = FALSE;
     sync_ie_checkPass           = FALSE;
     slotframelink_ie_checkPass  = FALSE; 
-    
+    location_checkPass 		= FALSE;    
     ptr = 0;
     mlme_ie_found = FALSE;
-    
+    location_t coordinates;
+
     while (ptr<pkt->length){
-    
+                       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)2,
+                            (errorparameter_t)1);
         temp16b  = *((uint8_t*)(pkt->payload)+ptr);
         temp16b |= (*((uint8_t*)(pkt->payload)+ptr+1))<<8;
         ptr += 2;
@@ -2390,28 +2419,48 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
     
     if (mlme_ie_found==FALSE){
         // didn't find the MLME payload IE
+      //printf("didn't find mlme payload ie");
         return FALSE;
     }
-    
+  //printf("packet lenght: %d\n", pkt->length);
+    uint8_t asdf;
+    asdf=0;
+    for (asdf=0; asdf<pkt->length;asdf++){
+      //printf("%x\n",pkt->payload[asdf]);
+    }
+  //printf("ielen: %d\n",ielen);
     while(
+
+        
         ptr<mlme_ie_content_offset+ielen &&
         (
             chTemplate_checkPass        == FALSE || 
             tsTemplate_checkpass        == FALSE ||
             sync_ie_checkPass           == FALSE ||
-            slotframelink_ie_checkPass  == FALSE 
+            slotframelink_ie_checkPass  == FALSE ||
+	        location_checkPass 		== FALSE 
         )
     ){
+                   openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)0,
+                            (errorparameter_t)0);
+      //printf("starting process of IE reading\n");
+
         // subID
         temp16b  = *((uint8_t*)(pkt->payload)+ptr);
         temp16b |= (*((uint8_t*)(pkt->payload)+ptr+1))<<8;
         ptr += 2;
-        
+      //printf("temp 16b: %x \n",temp16b);
+
         subtype = (temp16b & IEEE802154E_DESC_TYPE_IE_MASK)>>IEEE802154E_DESC_TYPE_IE_SHIFT;
         if (subtype == 1) {
             // this is long type subID
             subid  = (temp16b & IEEE802154E_DESC_SUBID_LONG_MLME_IE_MASK)>>IEEE802154E_DESC_SUBID_LONG_MLME_IE_SHIFT;
             sublen = (temp16b & IEEE802154E_DESC_LEN_LONG_MLME_IE_MASK);
+
+	      //printf("temp 16b: %x \n",temp16b);
+
+
             switch(subid){
             case IEEE802154E_MLME_CHANNELHOPPING_IE_SUBID:
                 channelhoppingTemplateIDStoreFromEB(*((uint8_t*)(pkt->payload+ptr)));
@@ -2425,6 +2474,8 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
             // this is short type subID
             subid  = (temp16b & IEEE802154E_DESC_SUBID_SHORT_MLME_IE_MASK)>>IEEE802154E_DESC_SUBID_SHORT_MLME_IE_SHIFT;
             sublen = (temp16b & IEEE802154E_DESC_LEN_SHORT_MLME_IE_MASK);
+	      //printf("Subtype 1 subid for IE: %x, IE length: %d \n",subid,sublen);
+
             switch(subid){
             case IEEE802154E_MLME_SYNC_IE_SUBID:
                 asnStoreFromEB((uint8_t*)(pkt->payload+ptr));
@@ -2444,6 +2495,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                     temp16b |= *((uint8_t*)(pkt->payload+ptr+3))<<8;
                     schedule_setFrameLength(temp16b);
                     numlinks = *((uint8_t*)(pkt->payload+ptr+4));               // number of links
+	              //printf("in old frrame if, numlinks:%d, pointer: %d\n",numlinks,ptr);
 
                     // shared TXRX anycast slot(s)
                     memset(&temp_neighbor,0,sizeof(temp_neighbor));
@@ -2464,15 +2516,58 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                             &temp_neighbor // neighbor
                         );
                     }
-                }
+
+                    ptr += (numlinks-1)*5;
+                    
+                }else{
+                  //printf("in else oldframe statement\n");
+		            numlinks = *((uint8_t*)(pkt->payload+ptr+4));
+		            ptr += (numlinks-1)*5;
+		        }
+              //printf("pointer: %d\n",ptr);
                 slotframelink_ie_checkPass = TRUE;
                 break;
+	    //location IE
+            case 0x39:
+              //printf("IE Length: %d, MLME IE Length: %d\n",sublen,ielen);
+
+                x = 0;
+                y = 0;
+                z = 0;
+                x = *((uint8_t*)(pkt->payload+ptr));
+		      //printf("x before the second byte is added: %x \n",x);
+                x |= *((uint8_t*)(pkt->payload+ptr+1))<<8;
+		        y = *((uint8_t*)(pkt->payload+ptr+2));
+
+                y |= *((uint8_t*)(pkt->payload+ptr+3))<<8;
+
+		        z = *((uint8_t*)(pkt->payload+ptr+4));
+                z |= *((uint8_t*)(pkt->payload+ptr+5))<<8;
+		        coordinates.x = x; //x coordinate
+		        coordinates.y  = y; //y coordinate
+		        coordinates.z  = z; //z coordinate
+                //printf("Received Location from Neighbor: %d, %d, %d, %x \n",coordinates.x ,coordinates.y,coordinates.z,pkt->l2_nextORpreviousHop);
+		        //printf("pointer: %d, stop condition: %d \n",ptr ,mlme_ie_content_offset+ielen);
+		        //neighbors_setLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
+		        location_checkPass == TRUE;
+                //openserial_printInfo(COMPONENT_IEEE802154E,ERR_SYNCHRONIZED,
+                   //   (errorparameter_t)ieee154e_vars.slotOffset,
+                    //  (errorparameter_t)*((uint8_t*)(pkt->payload+ptr+1))<<8);
+                   openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+                            (errorparameter_t)1,
+                            (errorparameter_t)1);
+                break;
             default:
+              //printf("unsupported iel\n");
                 // unsupported IE type, skip the ie
                 break;
             }
         }
+      //printf("sublength: %d\n, ",sublen);
         ptr += sublen;
+      //printf("pointer payload: %d\n", pkt->payload[ptr]);
+	  //printf("pointer: %d, stop condition: %d \n",ptr ,mlme_ie_content_offset+ielen);
+      //printf("\n");
     }
     
     if (

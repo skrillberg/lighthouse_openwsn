@@ -225,6 +225,7 @@ void ieee802154_retrieveHeader(OpenQueueEntry_t*      msg,
    ieee802514_header->dsn_suppressed = (temp_8b >> IEEE154_FCF_DSN_SUPPRESSION    ) & 0x01;//1b
 
    if (ieee802514_header->ieListPresent==TRUE && ieee802514_header->frameVersion!=IEEE154_FRAMEVERSION_2012){
+      //printf("return invalid due to p 64\n");
        return; //invalid packet accordint to p.64 IEEE15.4e
    }
    
@@ -335,7 +336,7 @@ void ieee802154_retrieveHeader(OpenQueueEntry_t*      msg,
    else if (ieee802514_header->securityEnabled && IEEE802154_SECURITY_SUPPORTED==0) {
       return; // security not supported
    }
-
+  //printf("before termination ie\n");
    // remove termination IE accordingly 
    if (ieee802514_header->ieListPresent == TRUE) {
        while(1) {
@@ -399,7 +400,7 @@ void ieee802154_retrieveHeader(OpenQueueEntry_t*      msg,
            if (ieee802514_header->headerLength>msg->length) {  return; } // no more to read!
        }
    }
-
+ //printf("after header ie processing\n");
    // Record the position where we should start decrypting if security is enabled
    msg->l2_payload = &msg->payload[ieee802514_header->headerLength];
 
@@ -408,6 +409,7 @@ void ieee802154_retrieveHeader(OpenQueueEntry_t*      msg,
       // the topology filter does accept this packet, return
       return;
    }
+ //printf("after topology is acceptable");
    // if you reach this, the header is valid
    ieee802514_header->valid=TRUE;
 }

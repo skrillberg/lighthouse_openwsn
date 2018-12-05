@@ -390,8 +390,21 @@ typedef struct {
    uint8_t          sequenceNumber;
    uint8_t          backoffExponenton;
    uint8_t          backoff;
+   struct{
+	int16_t     x;
+	int16_t	    y;
+	int16_t	    z;
+   }		    location;
 } neighborRow_t;
 END_PACK
+
+#define LOCATION_TYPE int16_t
+//location variables received from IE in EB
+typedef struct {
+   LOCATION_TYPE x;
+   LOCATION_TYPE y;
+   LOCATION_TYPE z;
+ } location_t;
 
 
 //=========================== variables =======================================

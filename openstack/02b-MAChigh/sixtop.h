@@ -108,6 +108,11 @@ typedef struct {
    sixtop_sf_getmetadata        cb_sf_getMetadata;
    sixtop_sf_translatemetadata  cb_sf_translateMetadata;
    sixtop_sf_handle_callback    cb_sf_handleRCError;
+   struct{
+      int16_t x;
+      int16_t y;
+      int16_t z; 
+   		}      location; 
 } sixtop_vars_t;
 
 //=========================== prototypes ======================================

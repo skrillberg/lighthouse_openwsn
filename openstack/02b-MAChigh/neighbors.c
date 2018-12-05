@@ -557,6 +557,26 @@ void neighbors_setNeighborNoResource(open_addr_t* address){
    }
 }
 
+//set location of neighbor
+void neighbors_setLocation(open_addr_t* l2_src,
+                          location_t* coordinates){
+	int i;
+   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+
+      if (isThisRowMatching(l2_src,i)) {
+                 
+         // whether the neighbor is considered as secure or not
+         neighbors_vars.neighbors[i].location.x = coordinates->x;
+         neighbors_vars.neighbors[i].location.y = coordinates->y;
+         neighbors_vars.neighbors[i].location.z = coordinates->z;
+
+			/*printf("location from set location: %f, %f, %f\n",(float)(neighbors_vars.neighbors[i].location.x)/10,
+																				(float)(neighbors_vars.neighbors[i].location.y)/10,
+																				(float)(neighbors_vars.neighbors[i].location.z)/10);*/
+		}
+	}
+}
+
 void neighbors_setPreferredParent(uint8_t index, bool isPreferred){
     neighbors_vars.neighbors[index].parentPreference = isPreferred;
 }

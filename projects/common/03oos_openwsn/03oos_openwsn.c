@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+/*
 #include <headers/hw_memmap.h>
 #include <source/gpio.h>
 #include <headers/hw_ioc.h>
@@ -30,7 +31,7 @@
 #include <source/systick.h>
 #include <headers/hw_cctest.h>
 #include <headers/hw_rfcore_xreg.h>
-
+*/
 int mote_main(void) {
    
    // initialize

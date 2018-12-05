@@ -6,13 +6,13 @@
 #include "scheduler.h"
 #include "IEEE802154E.h"
 #include "idmanager.h"
-#include "accel_mimsy.h"
-#include "gpio.h"
-#include "headers/hw_gpio.h"
-#include <headers/hw_memmap.h>
-#include "flash_mimsy.h"
-#include "headers/hw_ints.h"
-#include "inv_mpu.h"
+//#include "accel_mimsy.h"
+//#include "gpio.h"
+//#include "headers/hw_gpio.h"
+//#include <headers/hw_memmap.h>
+//#include "flash_mimsy.h"
+//#include "headers/hw_ints.h"
+//#include "inv_mpu.h"
 //=========================== variables =======================================
 
 uinject_vars_t uinject_vars;
@@ -39,6 +39,7 @@ void debounce_timer_cb(opentimers_id_t id);
 void uinject_init(void) {
     me = (uint8_t)(idmanager_getMyID(ADDR_64B)->addr_64b[7]);	
     //mimsyIMUInit();
+    /*
     struct int_param_s placeholder;
     mpu_init(&placeholder);
     //mpu_lp_accel_mode(1);
@@ -74,7 +75,7 @@ void uinject_init(void) {
     //ENABLE_INTERRUPTS();
 
     // 
-    
+    */
     // clear local variables
     memset(&uinject_vars,0,sizeof(uinject_vars_t));
 
@@ -137,7 +138,7 @@ void uinject_timer_cb(opentimers_id_t id){
  
    scheduler_push_task(uinject_task_cb,TASKPRIO_COAP);
 }
-
+/*
 void imu_int_cb(void){
    GPIOPinIntClear(GPIO_A_BASE, GPIO_PIN_7);
    IMUData data;
@@ -150,7 +151,7 @@ void imu_int_cb(void){
         
        opentimers_scheduleIn(
             uinject_vars.debounceTimerId,
-            1000,
+            1500,
             TIME_MS,
             TIMER_ONESHOT,
             debounce_timer_cb
@@ -158,7 +159,7 @@ void imu_int_cb(void){
        //SCHEDULER_WAKEUP();
     }
 }
-
+*/
 void debounce_timer_cb(opentimers_id_t id){
     debounce = 0;
 }

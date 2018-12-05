@@ -2,7 +2,7 @@
 #include "topology.h"
 #include "idmanager.h"
 
-#define FORCETOPOLOGY 
+//#define FORCETOPOLOGY 
 //=========================== defines =========================================
 
 //=========================== variables =======================================
