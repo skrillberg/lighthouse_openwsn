@@ -607,6 +607,7 @@ owerror_t sixtop_send_internal(
 // timer interrupt callbacks
 void sixtop_sendingEb_timer_cb(opentimers_id_t id){
     scheduler_push_task(timer_sixtop_sendEb_fired,TASKPRIO_SIXTOP);
+
     // update the period
     /*
     sixtop_vars.periodMaintenance  = 872 +(openrandom_get16b()&0xff);
@@ -632,7 +633,7 @@ void sixtop_timeout_timer_cb(opentimers_id_t id) {
 void timer_sixtop_sendEb_fired(void) {
     
     uint16_t newPeriod;
-
+    
     // send EBs on a portion of the minimal cells not exceeding 1/(3(N+1))
     // https://tools.ietf.org/html/draft-chang-6tisch-msf-01#section-2
     if(openrandom_get16b()<0xffff/(3*(neighbors_getNumNeighbors()+1))){
@@ -697,7 +698,7 @@ port_INLINE void sixtop_sendEB() {
     uint8_t     i;
     uint8_t     eb_len;
     uint16_t    temp16b;
-   
+
     if ((ieee154e_isSynch()==FALSE)                     ||
         (IEEE802154_security_isConfigured()==FALSE)     ||
         (icmpv6rpl_getMyDAGrank()==DEFAULTDAGRANK)      ||
@@ -750,6 +751,14 @@ port_INLINE void sixtop_sendEB() {
               (0x39 << IEEE802154E_DESC_SUBID_SHORT_MLME_IE_SHIFT) | 
                (loc_len-2) ;
   //printf("%d \n",temp16b);
+    sixtop_vars.location.x = 15;
+    /*openserial_printError(
+    COMPONENT_SIXTOP,
+    ERR_NO_FREE_PACKET_BUFFER,
+    (errorparameter_t)((uint8_t)(sixtop_vars.location.x & 0x00ff)),
+    (errorparameter_t)0
+);*/
+
     uint8_t loc_stream[8] = {(uint8_t)(temp16b & 0x00ff),
                              (uint8_t)((temp16b & 0xff00)>>8),
 
@@ -830,6 +839,7 @@ port_INLINE void sixtop_sendEB() {
    
     // I'm now busy sending an EB
     sixtop_vars.busySendingEB = TRUE;
+    
 }
 
 /**

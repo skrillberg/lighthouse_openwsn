@@ -559,7 +559,7 @@ void neighbors_setNeighborNoResource(open_addr_t* address){
 
 //set location of neighbor
 void neighbors_setLocation(open_addr_t* l2_src,
-                          location_t* coordinates){
+                          location_xyz_t* coordinates){
 	int i;
    for (i=0;i<MAXNUMNEIGHBORS;i++) {
 
@@ -742,7 +742,17 @@ bool debugPrint_neighbors() {
     neighbors_vars.debugRow=(neighbors_vars.debugRow+1)%MAXNUMNEIGHBORS;
     temp.row=neighbors_vars.debugRow;
     temp.neighborEntry=neighbors_vars.neighbors[neighbors_vars.debugRow];
+
+
+    
+
     openserial_printStatus(STATUS_NEIGHBORS,(uint8_t*)&temp,sizeof(debugNeighborEntry_t));
+    /*openserial_printError(
+        COMPONENT_IEEE802154E,
+        ERR_NO_FREE_PACKET_BUFFER,
+        (errorparameter_t)(5),
+        (errorparameter_t)0
+    );*/
     return TRUE;
 }
 

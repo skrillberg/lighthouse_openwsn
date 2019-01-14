@@ -68,7 +68,7 @@ uint8_t       neighbors_getSequenceNumber(open_addr_t* address);
 void          neighbors_setNeighborRank(uint8_t index, dagrank_t rank);
 void          neighbors_setNeighborNoResource(open_addr_t* address);
 void          neighbors_setPreferredParent(uint8_t index, bool isPreferred);
-void	        neighbors_setLocation(open_addr_t* l2_src, location_t* coordinates);
+void	        neighbors_setLocation(open_addr_t* l2_src, location_xyz_t* coordinates);
 
 // interrogators
 bool          neighbors_isStableNeighbor(open_addr_t* address);

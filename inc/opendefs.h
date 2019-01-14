@@ -96,6 +96,7 @@ enum {
    WKP_UDP_INJECT                      =   2018, //originally 61617 I changed it to 2018 to work with uinject_roll_pitcy.py              ,// 0xf0b1
    WKP_UDP_RINGMASTER                  =   15000,
    WKP_UDP_SERIALBRIDGE                =    2001,
+   WKP_UDP_LOCALIZATION                =    2019
 };
 
 //status elements
@@ -178,6 +179,7 @@ enum {
    COMPONENT_CJOIN                     = 0x2b,
    COMPONENT_OPENOSCOAP                = 0x2c,
    COMPONENT_CINFRARED                 = 0x2d,
+   COMPONENT_localization              = 0x2e,
 };
 
 /**
@@ -404,7 +406,7 @@ typedef struct {
    LOCATION_TYPE x;
    LOCATION_TYPE y;
    LOCATION_TYPE z;
- } location_t;
+ } location_xyz_t;
 
 
 //=========================== variables =======================================

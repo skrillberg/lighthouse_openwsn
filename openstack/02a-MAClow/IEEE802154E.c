@@ -750,6 +750,8 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime) 
                        openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
                             (errorparameter_t)7,
                             (errorparameter_t)1);
+      //openserial_printSniffedPacket(ieee154e_vars.dataReceived->payload ,ieee154e_vars.dataReceived->length,0);
+
       if (
             (
                ieee802514_header.valid==TRUE                                                       &&
@@ -2391,12 +2393,18 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
     location_checkPass 		= FALSE;    
     ptr = 0;
     mlme_ie_found = FALSE;
-    location_t coordinates;
+    location_xyz_t coordinates;
+
+    //openserial_printSniffedPacket(pkt->payload,pkt->length,0);
+
+       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+            (errorparameter_t)2,
+            (errorparameter_t)1);
 
     while (ptr<pkt->length){
-                       openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
-                            (errorparameter_t)2,
-                            (errorparameter_t)1);
+       /*openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
+            (errorparameter_t)2,
+            (errorparameter_t)1);*/
         temp16b  = *((uint8_t*)(pkt->payload)+ptr);
         temp16b |= (*((uint8_t*)(pkt->payload)+ptr+1))<<8;
         ptr += 2;
@@ -2441,9 +2449,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
 	        location_checkPass 		== FALSE 
         )
     ){
-                   openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
-                            (errorparameter_t)0,
-                            (errorparameter_t)0);
+
       //printf("starting process of IE reading\n");
 
         // subID
@@ -2548,14 +2554,25 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
 		        coordinates.z  = z; //z coordinate
                 //printf("Received Location from Neighbor: %d, %d, %d, %x \n",coordinates.x ,coordinates.y,coordinates.z,pkt->l2_nextORpreviousHop);
 		        //printf("pointer: %d, stop condition: %d \n",ptr ,mlme_ie_content_offset+ielen);
-		        //neighbors_setLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
+		        neighbors_setLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
+
+                /*openserial_printError(
+                    COMPONENT_IEEE802154E,
+                    ERR_NO_FREE_PACKET_BUFFER,
+                    (errorparameter_t)((uint8_t)neighbors_getNumNeighbors()),
+                    (errorparameter_t)0
+                );*/
+                
 		        location_checkPass == TRUE;
                 //openserial_printInfo(COMPONENT_IEEE802154E,ERR_SYNCHRONIZED,
                    //   (errorparameter_t)ieee154e_vars.slotOffset,
                     //  (errorparameter_t)*((uint8_t*)(pkt->payload+ptr+1))<<8);
-                   openserial_printError(COMPONENT_IEEE802154E,ERR_LARGE_TIMECORRECTION,
-                            (errorparameter_t)1,
-                            (errorparameter_t)1);
+                /*openserial_printError(
+                    COMPONENT_IEEE802154E,
+                    ERR_NO_FREE_PACKET_BUFFER,
+                    (errorparameter_t)(x),
+                    (errorparameter_t)(pkt->length)
+                );*/
                 break;
             default:
               //printf("unsupported iel\n");
