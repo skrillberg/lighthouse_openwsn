@@ -2567,12 +2567,24 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                 //openserial_printInfo(COMPONENT_IEEE802154E,ERR_SYNCHRONIZED,
                    //   (errorparameter_t)ieee154e_vars.slotOffset,
                     //  (errorparameter_t)*((uint8_t*)(pkt->payload+ptr+1))<<8);
-                /*openserial_printError(
+                openserial_printError(
                     COMPONENT_IEEE802154E,
                     ERR_NO_FREE_PACKET_BUFFER,
                     (errorparameter_t)(x),
                     (errorparameter_t)(pkt->length)
-                );*/
+                );
+                openserial_printError(
+                    COMPONENT_IEEE802154E,
+                    ERR_NO_FREE_PACKET_BUFFER,
+                    (errorparameter_t)(y),
+                    (errorparameter_t)(pkt->length)
+                );
+                openserial_printError(
+                    COMPONENT_IEEE802154E,
+                    ERR_NO_FREE_PACKET_BUFFER,
+                    (errorparameter_t)(z),
+                    (errorparameter_t)(pkt->length)
+                );
                 break;
             default:
               //printf("unsupported iel\n");

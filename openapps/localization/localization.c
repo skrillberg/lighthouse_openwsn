@@ -26,6 +26,7 @@
 #include "headers/hw_gpio.h"
 #include "headers/hw_ioc.h"
 #include "ioc.h"
+#include "sixtop.h"
 
 //=========================== variables =======================================
 
@@ -58,6 +59,7 @@ volatile uint32_t count;
 volatile uint32_t wsn_count;
 
 volatile bool testRan;
+volatile extern sixtop_vars_t sixtop_vars;
 
 //=========================== prototypes ======================================
 
@@ -200,6 +202,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
     modular_ptr++; if (modular_ptr == 5) modular_ptr = 0;
 
     pulse_count += 1;
+
 }
 
 /**
@@ -253,7 +256,16 @@ void localization_task_cb(void) {
    }
 
    // perform localization calculations
-	location_t loc = localize_mimsy(pulses_local);
+
+    location_t loc = localize_mimsy(pulses_local);
+   //sixtop_vars.location.x = (uint16_t) pulses_local[0].fall;
+  /*openserial_printError(
+     COMPONENT_localization,
+     ERR_NO_FREE_PACKET_BUFFER,
+     (errorparameter_t)(uint16_t) pulses_local[0].fall,
+     (errorparameter_t)0
+  );*/
+
    if (!loc.valid) return;
 
    //x.flt = *r * sinf(*theta) * cosf(*phi);
@@ -416,6 +428,12 @@ location_t localize_mimsy(pulse_t *pulses_local) {
                 if (axis == ((int) valid_seq_a[ind]) || axis == ((int) valid_seq_b[ind])) {
                     sweep_axes_check += axis; // check for 1 horizontal, 1 vertical sweep
                 } else {
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) 60,
+                     (errorparameter_t)0
+                  );
                     return loc;
                 }
             }
@@ -426,6 +444,12 @@ location_t localize_mimsy(pulse_t *pulses_local) {
             pulses_local[i].type = (int) Sync;
         } else { // neither
             pulses_local[i].type = -1;
+            openserial_printError(
+                 COMPONENT_localization,
+                 ERR_NO_FREE_PACKET_BUFFER,
+                 (errorparameter_t)(uint16_t) 61,
+                 (errorparameter_t)0
+              );
             return loc;
         }
     }
@@ -448,11 +472,21 @@ location_t localize_mimsy(pulse_t *pulses_local) {
                 loc.r_vert = distance_fit_vert(get_period_us(next_pulse.rise, next_pulse.fall));
                 break;
             default:
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) 63,
+                     (errorparameter_t)0
+                  );
                 return loc;
                 break;
         }
     }
 
     loc.valid = true;
+    sixtop_vars.location.x = loc.phi*1000;
+    sixtop_vars.location.y = loc.theta*1000;
+    sixtop_vars.location.z = loc.r_horiz*1000;
+
     return loc;
 }

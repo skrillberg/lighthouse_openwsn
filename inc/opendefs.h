@@ -271,6 +271,9 @@ enum {
    ERR_REPLAY_FAILED                   = 0x47, // OSCOAP replay protection failed
    ERR_DECRYPTION_FAILED               = 0x48, // OSCOAP decryption and tag verification failed
    ERR_ABORT_JOIN_PROCESS              = 0x49, // Aborted join process {code location {0}}
+   //localization
+   ERR_LOC_INVALID_PULSE_TYPE          = 0x4a, //invalid pulse type
+   ERR_LOC_INVALID_PULSE_LEN           = 0x4b, //invalid pulse length
 };
 
 //=========================== typedef =========================================

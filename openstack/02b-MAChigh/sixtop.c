@@ -751,7 +751,7 @@ port_INLINE void sixtop_sendEB() {
               (0x39 << IEEE802154E_DESC_SUBID_SHORT_MLME_IE_SHIFT) | 
                (loc_len-2) ;
   //printf("%d \n",temp16b);
-    sixtop_vars.location.x = 15;
+    //sixtop_vars.location.x = 15;
     /*openserial_printError(
     COMPONENT_SIXTOP,
     ERR_NO_FREE_PACKET_BUFFER,
