@@ -189,6 +189,15 @@ void localization_receive(OpenQueueEntry_t* pkt) {
 
 //=========================== private =========================================
 
+float get_period_us(uint32_t start, uint32_t end) {
+    if (start > end) {
+        // do overflow arithmetic
+        return ((float) (end + (timer_cnt_24 - start))) / CLOCK_SPEED_MHZ;
+    } else {
+        return ((float) (end - start)) / CLOCK_SPEED_MHZ;
+    }
+}
+
 void mimsy_GPIO_falling_edge_handler(void) {
     TimerIntClear(gptmEdgeTimerBase, gptmFallingEdgeEvent);
 
@@ -203,11 +212,13 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
     //ADDED BY KILBERG: classify for sync pulse so we can capture asn and timer offset. This should only be done if 
     //this mote is the sync mote, but this needs to be implemented
-    /*
-    if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD)){
+    float period = get_period_us(pulses[modular_ptr].rise, pulses[modular_ptr].fall);
+    if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US)){
         ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
-        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;    
-    }*/
+        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+
+    }
+
     pulse_count += 1;
 
 }
@@ -266,6 +277,7 @@ void localization_task_cb(void) {
 
     location_t loc = localize_mimsy(pulses_local);
    //sixtop_vars.location.x = (uint16_t) pulses_local[0].fall;
+    /*
   openserial_printError(
      COMPONENT_localization,
      ERR_NO_FREE_PACKET_BUFFER,
@@ -277,7 +289,7 @@ void localization_task_cb(void) {
      ERR_NO_FREE_PACKET_BUFFER,
      (errorparameter_t)(uint16_t)ieee154e_vars.slotDuration,
      (errorparameter_t)0
-  );
+  );*/
 
    if (!loc.valid) return;
 
@@ -392,14 +404,6 @@ float get_period_us_32(uint32_t start, uint32_t end) {
     }
 }
 
-float get_period_us(uint32_t start, uint32_t end) {
-    if (start > end) {
-        // do overflow arithmetic
-        return ((float) (end + (timer_cnt_24 - start))) / CLOCK_SPEED_MHZ;
-    } else {
-        return ((float) (end - start)) / CLOCK_SPEED_MHZ;
-    }
-}
 
 /** Returns a number defining our 3 information bits: skip, data, axis.
   Given by our pulse length in microseconds (us). */
@@ -501,6 +505,17 @@ location_t localize_mimsy(pulse_t *pulses_local) {
     sixtop_vars.location.x = loc.phi*1000;
     sixtop_vars.location.y = loc.theta*1000;
     sixtop_vars.location.z = loc.r_horiz*1000;
-
+    openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_asn[0]+ sixtop_vars.sync_pulse_asn[1]*256,
+         (errorparameter_t)0
+      );
+    openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
+         (errorparameter_t)0
+      );
     return loc;
 }
