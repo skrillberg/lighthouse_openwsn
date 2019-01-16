@@ -113,6 +113,9 @@ typedef struct {
       int16_t y;
       int16_t z; 
    		}      location; 
+
+   uint8_t                      sync_pulse_asn[5];
+   PORT_TIMER_WIDTH             sync_pulse_timer_offset;
 } sixtop_vars_t;
 
 //=========================== prototypes ======================================

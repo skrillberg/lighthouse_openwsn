@@ -60,7 +60,7 @@ volatile uint32_t wsn_count;
 
 volatile bool testRan;
 volatile extern sixtop_vars_t sixtop_vars;
-
+extern ieee154e_vars_t ieee154e_vars;
 //=========================== prototypes ======================================
 
 void localization_timer_cb(opentimers_id_t id);
@@ -201,6 +201,13 @@ void mimsy_GPIO_falling_edge_handler(void) {
     pulses[modular_ptr].fall = (uint32_t)(HWREG(gptmTimer3BReg)); // TimerValueGet(gptmEdgeTimerBase, GPTIMER_B);
     modular_ptr++; if (modular_ptr == 5) modular_ptr = 0;
 
+    //ADDED BY KILBERG: classify for sync pulse so we can capture asn and timer offset. This should only be done if 
+    //this mote is the sync mote, but this needs to be implemented
+    /*
+    if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD)){
+        ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
+        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;    
+    }*/
     pulse_count += 1;
 
 }
@@ -259,12 +266,18 @@ void localization_task_cb(void) {
 
     location_t loc = localize_mimsy(pulses_local);
    //sixtop_vars.location.x = (uint16_t) pulses_local[0].fall;
-  /*openserial_printError(
+  openserial_printError(
      COMPONENT_localization,
      ERR_NO_FREE_PACKET_BUFFER,
-     (errorparameter_t)(uint16_t) pulses_local[0].fall,
+     (errorparameter_t)(uint16_t) opentimers_getValue()-ieee154e_vars.startOfSlotReference,
      (errorparameter_t)0
-  );*/
+  );
+  openserial_printError(
+     COMPONENT_localization,
+     ERR_NO_FREE_PACKET_BUFFER,
+     (errorparameter_t)(uint16_t)ieee154e_vars.slotDuration,
+     (errorparameter_t)0
+  );
 
    if (!loc.valid) return;
 
@@ -441,6 +454,7 @@ location_t localize_mimsy(pulse_t *pulses_local) {
             if (init_sync_index == PULSE_TRACK_COUNT) {
             	init_sync_index = i; // set initial valid sync pulse index
             }
+            
             pulses_local[i].type = (int) Sync;
         } else { // neither
             pulses_local[i].type = -1;
