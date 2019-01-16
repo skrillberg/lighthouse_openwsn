@@ -97,6 +97,7 @@ bool sixtop_areAvailableCellsToBeRemoved(
 
 //=========================== public ==========================================
 
+
 void sixtop_init() {
     
     sixtop_vars.periodMaintenance  = 872 +(openrandom_get16b()&0xff);

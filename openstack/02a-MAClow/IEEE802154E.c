@@ -41,6 +41,8 @@
 #include "board.h"
 //#include "leds.h"
 
+#include "/home/vagrant/openwsn-craig/openwsn-fw/openapps/localization/localization.h"
+
 //=========================== variables =======================================
 
 ieee154e_vars_t    ieee154e_vars;
@@ -122,6 +124,7 @@ bool     debugPrint_isSync(void);
 void     isr_ieee154e_newSlot(opentimers_id_t id);
 void     isr_ieee154e_timer(opentimers_id_t id);
 
+extern void loc_record_start_of_slot(void); 
 //=========================== admin ===========================================
 
 /**
@@ -299,6 +302,7 @@ This function executes in ISR mode, when the new slot timer fires.
 void isr_ieee154e_newSlot(opentimers_id_t id) {
     
     ieee154e_vars.startOfSlotReference = opentimers_getCurrentTimeout();
+    loc_record_start_of_slot(); 
     opentimers_scheduleAbsolute(
         ieee154e_vars.timerId,                  // timerId
         TsSlotDuration,                         // duration

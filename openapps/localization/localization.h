@@ -34,6 +34,8 @@ typedef struct {
    uint16_t             counter;  ///< incrementing counter which is written into the packet
    uint16_t              period;  ///< localization packet sending period>
    udp_resource_desc_t     desc;  ///< resource descriptor for this module, used to register at UDP stack
+   uint32_t          sync_count;
+   uint32_t          start_of_slot; //records start of current slot with respect to localization timer 
 } localization_vars_t;
 
 typedef struct {
@@ -60,6 +62,7 @@ typedef enum {
 void localization_init(void);
 void localization_sendDone(OpenQueueEntry_t* msg, owerror_t error);
 void localization_receive(OpenQueueEntry_t* msg);
+void loc_record_start_of_slot(void); 
 /**
 \}
 \}

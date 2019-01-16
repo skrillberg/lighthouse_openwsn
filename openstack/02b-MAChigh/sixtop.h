@@ -116,6 +116,8 @@ typedef struct {
 
    uint8_t                      sync_pulse_asn[5];
    PORT_TIMER_WIDTH             sync_pulse_timer_offset;
+   uint32_t                     sync_pulse_period;
+   uint32_t                     viveTimerStartOfSlotReference;
 } sixtop_vars_t;
 
 //=========================== prototypes ======================================
@@ -153,6 +155,8 @@ bool      debugPrint_kaPeriod(void);
 // control
 void      sixtop_setIsResponseEnabled(bool isEnabled);
 
+void precision_timers_init(void);
+void input_edge_timers_init(void);
 /**
 \}
 \}

@@ -187,6 +187,11 @@ void localization_receive(OpenQueueEntry_t* pkt) {
    );
 }
 
+//record current time of start of tsch slot in localization ticks
+void loc_record_start_of_slot(void){
+    localization_vars.start_of_slot = TimerValueGet(gptmEdgeTimerBase, GPTIMER_B);
+}
+
 //=========================== private =========================================
 
 float get_period_us(uint32_t start, uint32_t end) {
@@ -196,6 +201,12 @@ float get_period_us(uint32_t start, uint32_t end) {
     } else {
         return ((float) (end - start)) / CLOCK_SPEED_MHZ;
     }
+}
+
+/** Returns a number defining our 3 information bits: skip, data, axis.
+  Given by our pulse length in microseconds (us). */
+unsigned short int sync_bits(float duration) {
+  return (unsigned short int) (48*duration - 2501) / 500;
 }
 
 void mimsy_GPIO_falling_edge_handler(void) {
@@ -208,17 +219,73 @@ void mimsy_GPIO_falling_edge_handler(void) {
     // shift previous pulses and write to struct
     pulses[modular_ptr].rise = (uint32_t)(HWREG(gptmTimer3AReg)); // TimerValueGet(gptmEdgeTimerBase, GPTIMER_A);
     pulses[modular_ptr].fall = (uint32_t)(HWREG(gptmTimer3BReg)); // TimerValueGet(gptmEdgeTimerBase, GPTIMER_B);
-    modular_ptr++; if (modular_ptr == 5) modular_ptr = 0;
+    
+    
 
     //ADDED BY KILBERG: classify for sync pulse so we can capture asn and timer offset. This should only be done if 
     //this mote is the sync mote, but this needs to be implemented
     float period = get_period_us(pulses[modular_ptr].rise, pulses[modular_ptr].fall);
-    if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US)){
-        ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
-        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+    
+    //only counts horizontal sync bits
+    if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US) && ((sync_bits(period) & 0b001) + 1 == 1)){
+        
+        uint32_t last_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[2]*65536 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
+                    + sixtop_vars.sync_pulse_timer_offset; 
+        uint32_t timer_value = opentimers_getValue();
+/*
+      openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)44444,
+         (errorparameter_t)0
+      );            
+      openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t)localization_vars.start_of_slot,
+         (errorparameter_t)0
+      );    
+      openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t)pulses[modular_ptr].fall,
+         (errorparameter_t)0
+      );    
 
+      openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)44444,
+         (errorparameter_t)0
+      );   */         
+        ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
+        //sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
+        /*   
+        if(pulses[modular_ptr].fall > localization_vars.start_of_slot){
+            sixtop_vars.sync_pulse_timer_offset = (pulses[modular_ptr].fall - localization_vars.start_of_slot)/977;
+        }else{
+            sixtop_vars.sync_pulse_timer_offset = ((timer_cnt_24 - localization_vars.start_of_slot) + pulses[modular_ptr].fall)/977;
+            
+        }*/
+
+        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+        uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
+                    + sixtop_vars.sync_pulse_timer_offset; 
+
+        if(curr_time - last_time < 1000){
+            sixtop_vars.sync_pulse_period = (curr_time-last_time);
+            localization_vars.sync_count += 1;
+            
+        }    
     }
 
+    modular_ptr++; if (modular_ptr == 5) modular_ptr = 0;
     pulse_count += 1;
 
 }
@@ -405,11 +472,7 @@ float get_period_us_32(uint32_t start, uint32_t end) {
 }
 
 
-/** Returns a number defining our 3 information bits: skip, data, axis.
-  Given by our pulse length in microseconds (us). */
-unsigned short int sync_bits(float duration) {
-  return (unsigned short int) (48*duration - 2501) / 500;
-}
+
 
 float distance_fit_horiz(float time_us) {
   float E = 0.2218; float c0 = -0.3024; float c1 = 18.2991;
@@ -517,5 +580,30 @@ location_t localize_mimsy(pulse_t *pulses_local) {
          (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
          (errorparameter_t)0
       );
+    openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
+         (errorparameter_t)0
+      );
+    openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
+         (errorparameter_t)0
+      );
+    openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_period,
+         (errorparameter_t)0
+      );
+    openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)11111,
+         (errorparameter_t)0
+      );
+
     return loc;
 }
