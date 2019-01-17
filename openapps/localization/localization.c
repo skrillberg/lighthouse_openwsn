@@ -53,6 +53,7 @@ static const float sweep_velocity = PI / SWEEP_PERIOD_US;
 
 volatile pulse_t valid_pulses[PULSE_TRACK_COUNT][PULSE_TRACK_COUNT];
 volatile pulse_t pulses[PULSE_TRACK_COUNT];
+volatile pulse_t asn_pulses[PULSE_TRACK_COUNT];
 volatile uint8_t modular_ptr;
 volatile uint32_t pulse_count;
 volatile uint32_t count;
@@ -70,7 +71,7 @@ void precision_timers_init(void);
 void input_edge_timers_init(void);
 void mimsy_GPIO_falling_edge_handler(void);
 
-location_t localize_mimsy(pulse_t *pulses_local);
+location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 
 //=========================== public ==========================================
 
@@ -84,6 +85,7 @@ void localization_init(void) {
     unsigned short int i;
     for (i = 0; i < PULSE_TRACK_COUNT; i++) {
         pulses[i] = (pulse_t){.rise = 0, .fall = 0, .type = -1};
+        asn_pulses[i] = (pulse_t){.rise = 0, .fall = 0, .type = -1};
     }
     unsigned short int j;
     for (i = 0; i < PULSE_TRACK_COUNT; i++) {
@@ -253,7 +255,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
         }*/
 
         //update the projected sync time
-        sixtop_vars.ref_sync_pulse += (uint32_t)(sixtop_vars.sync_pulse_period*100);    //multiplied by 100 to provide more sig figs
+        //sixtop_vars.ref_sync_pulse += (uint32_t)(sixtop_vars.sync_pulse_period*100);    //multiplied by 100 to provide more sig figs
 
         sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
         uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
@@ -263,7 +265,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
                     + sixtop_vars.sync_pulse_timer_offset; 
 
         sixtop_vars.current_sync_pulse_time = curr_time;
-
+        asn_pulses[modular_ptr].fall = curr_time;
 
 
            /*
@@ -286,7 +288,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
         if(raw_diff < 600 && raw_diff>400){
 
             //selectively upadate saved time every x number of pulses
-            if(localization_vars.sync_count % 240 == 0){
+            if(localization_vars.sync_count % LIGHTHOUSE_KA_PERIODS == 0){
 
 
                 sixtop_vars.ref_sync_pulse = curr_time*100; //multiplied by 100 to provide more sig figs
@@ -301,13 +303,13 @@ void mimsy_GPIO_falling_edge_handler(void) {
             }else{
                 diff = (uint16_t)(curr_time *100) - (uint16_t) sixtop_vars.ref_sync_pulse ; 
             }
-
+/*
           openserial_printError(
              COMPONENT_localization,
              ERR_NO_FREE_PACKET_BUFFER,
              (errorparameter_t) (uint16_t)(diff),
              (errorparameter_t)0
-          ); 
+          ); */
             if(localization_vars.sync_count > 30){
                 sixtop_vars.sync_pulse_period = (float)sixtop_vars.sync_pulse_period/(float)(localization_vars.sync_count + 1 )*(float)(localization_vars.sync_count)
 		            +(float)(raw_diff)/(float)(localization_vars.sync_count + 1);
@@ -378,6 +380,7 @@ void localization_task_cb(void) {
    } z;
 
    pulse_t pulses_local[PULSE_TRACK_COUNT];
+   pulse_t asn_pulses_local[PULSE_TRACK_COUNT];
    uint8_t ptr = modular_ptr;
 
    wsn_count += 1;
@@ -389,9 +392,14 @@ void localization_task_cb(void) {
      pulses_local[i-ptr].type = pulses[i%PULSE_TRACK_COUNT].type;
    }
 
+   for (i = ptr; i < ptr + PULSE_TRACK_COUNT; i++) {
+     asn_pulses_local[i-ptr].rise = asn_pulses[i%PULSE_TRACK_COUNT].rise;
+     asn_pulses_local[i-ptr].fall = asn_pulses[i%PULSE_TRACK_COUNT].fall;
+     asn_pulses_local[i-ptr].type = asn_pulses[i%PULSE_TRACK_COUNT].type;
+   }
    // perform localization calculations
 
-    location_t loc = localize_mimsy(pulses_local);
+    location_t loc = localize_mimsy(pulses_local, asn_pulses_local);
    //sixtop_vars.location.x = (uint16_t) pulses_local[0].fall;
     /*
   openserial_printError(
@@ -533,7 +541,7 @@ float distance_fit_vert(float time_us) {
   return E + c1 / (time_us - c0 * sweep_velocity);
 }
 
-location_t localize_mimsy(pulse_t *pulses_local) {
+location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
     location_t loc = (location_t){.phi = 0, .theta = 0,
 											.r_vert = 0, .r_horiz = 0,
 											.asn =  {0, 0, 0, 0, 0}, .valid = 0};
@@ -598,6 +606,25 @@ location_t localize_mimsy(pulse_t *pulses_local) {
             case ((int) Horiz):
                 loc.phi = get_period_us(curr_pulse.fall, next_pulse.rise) * sweep_velocity;
                 loc.r_horiz = distance_fit_horiz(get_period_us(next_pulse.rise, next_pulse.fall));
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) asn_pulses_local[i].fall,
+                     (errorparameter_t)0
+                );
+                uint32_t periods_from_ref = (uint32_t)((float)((asn_pulses_local[i].fall*100 - sixtop_vars.ref_sync_pulse)) / (sixtop_vars.sync_pulse_period*100));
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) (sixtop_vars.ref_sync_pulse/100 + sixtop_vars.sync_pulse_period*periods_from_ref),
+                     (errorparameter_t)0
+                );
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) 11111,
+                     (errorparameter_t)0
+                );
                 break;
             case ((int) Vert):
                 loc.theta = get_period_us(curr_pulse.fall, next_pulse.rise) * sweep_velocity;

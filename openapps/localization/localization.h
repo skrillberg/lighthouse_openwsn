@@ -13,7 +13,7 @@
 
 //=========================== define ==========================================
 
-#define LOCALIZATION_PERIOD_MS 2500
+#define LOCALIZATION_PERIOD_MS 1000
 #define PULSE_TRACK_COUNT 5
 
 #define MIN_SYNC_PERIOD_US 52
@@ -24,6 +24,7 @@
 #define DIODE_WIDTH_CM 0.45f // FIXME: measure for PCB
 
 #define LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD 546.133333f  //in 32khz ticks
+#define LIGHTHOUSE_KA_PERIODS 240
 #define CLOCK_SPEED_MHZ 32.0f
 
 //=========================== typedef =========================================
