@@ -115,8 +115,10 @@ typedef struct {
    		}      location; 
 
    uint8_t                      sync_pulse_asn[5];
+   uint32_t                      ref_sync_pulse;            //time in absolute 32 khz ticks that the reference pulse is at
+   uint32_t                     current_sync_pulse_time;
    PORT_TIMER_WIDTH             sync_pulse_timer_offset;
-   uint32_t                     sync_pulse_period;
+   float 			sync_pulse_period;
    uint32_t                     viveTimerStartOfSlotReference;
 } sixtop_vars_t;
 
