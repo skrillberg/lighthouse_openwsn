@@ -266,6 +266,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
         sixtop_vars.current_sync_pulse_time = curr_time;
         asn_pulses[modular_ptr].fall = curr_time;
+        asn_pulses[modular_ptr].rise = (uint32_t)((float)curr_time - (period*32/967.5625)); //curr_time is in 32.768 khz tick units
 
 
            /*
@@ -610,6 +611,12 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                      COMPONENT_localization,
                      ERR_NO_FREE_PACKET_BUFFER,
                      (errorparameter_t)(uint16_t) asn_pulses_local[i].fall,
+                     (errorparameter_t)0
+                );
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) asn_pulses_local[i].rise,
                      (errorparameter_t)0
                 );
                 uint32_t periods_from_ref = (uint32_t)((float)((asn_pulses_local[i].fall*100 - sixtop_vars.ref_sync_pulse)) / (sixtop_vars.sync_pulse_period*100));
