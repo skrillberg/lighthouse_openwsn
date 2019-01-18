@@ -26,7 +26,7 @@
 #define LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD 546.133333f  //in 32khz ticks
 #define LIGHTHOUSE_KA_PERIODS 240
 #define CLOCK_SPEED_MHZ 32.0f
-
+#define GPT_TICKS_PER_SC_TICK 976.5625f
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
@@ -38,6 +38,7 @@ typedef struct {
    udp_resource_desc_t     desc;  ///< resource descriptor for this module, used to register at UDP stack
    uint32_t          sync_count;
    uint32_t          start_of_slot; //records start of current slot with respect to localization timer 
+   uint32_t          last_sync_time; //time of last horiz sync pulse
    
 } localization_vars_t;
 

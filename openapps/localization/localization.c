@@ -235,14 +235,6 @@ void mimsy_GPIO_falling_edge_handler(void) {
     //only counts horizontal sync bits
     if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US) && ((sync_bits(period) & 0b001) + 1 == 1)){
         
-        uint32_t last_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[2]*65536 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
-                    + sixtop_vars.sync_pulse_timer_offset; 
-        uint32_t timer_value = opentimers_getValue();
-        
-
         ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
 
         //sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
@@ -280,11 +272,10 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
         uint32_t raw_diff;
 
-        if(curr_time > last_time){
-            raw_diff = curr_time - last_time;
-        }else{
-            raw_diff = last_time - curr_time;
-        }
+
+        raw_diff = curr_time - localization_vars.last_sync_time;
+        localization_vars.last_sync_time = curr_time; 
+
         //filters out bad pulse timings, need to figure out why this is a problem
         if(raw_diff < 600 && raw_diff>400){
 
@@ -296,21 +287,8 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
             }
 
-            uint16_t diff;
-            if((uint16_t)sixtop_vars.ref_sync_pulse > (uint16_t)(curr_time*100)){
 
-                diff = (uint16_t) sixtop_vars.ref_sync_pulse - (uint16_t)(curr_time*100);
 
-            }else{
-                diff = (uint16_t)(curr_time *100) - (uint16_t) sixtop_vars.ref_sync_pulse ; 
-            }
-/*
-          openserial_printError(
-             COMPONENT_localization,
-             ERR_NO_FREE_PACKET_BUFFER,
-             (errorparameter_t) (uint16_t)(diff),
-             (errorparameter_t)0
-          ); */
             if(localization_vars.sync_count > 30){
                 sixtop_vars.sync_pulse_period = (float)sixtop_vars.sync_pulse_period/(float)(localization_vars.sync_count + 1 )*(float)(localization_vars.sync_count)
 		            +(float)(raw_diff)/(float)(localization_vars.sync_count + 1);
@@ -333,8 +311,21 @@ void mimsy_GPIO_falling_edge_handler(void) {
             }else{
 	            sixtop_vars.sync_pulse_period = LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD;
                 localization_vars.sync_count += 1;
-	        }   
+	        } 
+        
         } 
+    }else{
+        ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
+        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+        uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
+                    + sixtop_vars.sync_pulse_timer_offset; 
+
+        sixtop_vars.current_sync_pulse_time = curr_time;
+        asn_pulses[modular_ptr].fall = curr_time;
+        asn_pulses[modular_ptr].rise = (uint32_t)((float)curr_time - (period*32/967.5625)); //curr_time is in 32.768 khz tick units
     }
 
     modular_ptr++; if (modular_ptr == 5) modular_ptr = 0;
@@ -607,31 +598,36 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
             case ((int) Horiz):
                 loc.phi = get_period_us(curr_pulse.fall, next_pulse.rise) * sweep_velocity;
                 loc.r_horiz = distance_fit_horiz(get_period_us(next_pulse.rise, next_pulse.fall));
-                openserial_printError(
-                     COMPONENT_localization,
-                     ERR_NO_FREE_PACKET_BUFFER,
-                     (errorparameter_t)(uint16_t) asn_pulses_local[i].fall,
-                     (errorparameter_t)0
-                );
-                openserial_printError(
-                     COMPONENT_localization,
-                     ERR_NO_FREE_PACKET_BUFFER,
-                     (errorparameter_t)(uint16_t) asn_pulses_local[i].rise,
-                     (errorparameter_t)0
-                );
+
                 uint32_t periods_from_ref = (uint32_t)((float)((asn_pulses_local[i].fall*100 - sixtop_vars.ref_sync_pulse)) / (sixtop_vars.sync_pulse_period*100));
-                openserial_printError(
-                     COMPONENT_localization,
-                     ERR_NO_FREE_PACKET_BUFFER,
-                     (errorparameter_t)(uint16_t) (sixtop_vars.ref_sync_pulse/100 + sixtop_vars.sync_pulse_period*periods_from_ref),
-                     (errorparameter_t)0
-                );
-                openserial_printError(
-                     COMPONENT_localization,
-                     ERR_NO_FREE_PACKET_BUFFER,
-                     (errorparameter_t)(uint16_t) 11111,
-                     (errorparameter_t)0
-                );
+                uint32_t proj_sync_fall = sixtop_vars.ref_sync_pulse/100 + sixtop_vars.sync_pulse_period*periods_from_ref;
+                if(periods_from_ref < LIGHTHOUSE_KA_PERIODS){
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) periods_from_ref,
+                         (errorparameter_t)0
+                    );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) ((next_pulse.rise - curr_pulse.fall) * sweep_velocity/32.0 * 1000),
+                         (errorparameter_t)0
+                    );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) (((asn_pulses_local[i+1].rise - proj_sync_fall)*GPT_TICKS_PER_SC_TICK) * sweep_velocity/32.0*1000),
+                         (errorparameter_t)0
+                    );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) 11111,
+                         (errorparameter_t)0
+                    );
+                }
+
                 break;
             case ((int) Vert):
                 loc.theta = get_period_us(curr_pulse.fall, next_pulse.rise) * sweep_velocity;
