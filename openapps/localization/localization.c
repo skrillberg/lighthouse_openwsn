@@ -623,9 +623,23 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                     openserial_printError(
                          COMPONENT_localization,
                          ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) ((next_pulse.rise - curr_pulse.fall)/GPT_TICKS_PER_SC_TICK ),
+                         (errorparameter_t)0
+                    );
+
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) (((asn_pulses_local[i+1].rise - proj_sync_fall))),
+                         (errorparameter_t)0
+                    );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
                          (errorparameter_t)(uint16_t) 11111,
                          (errorparameter_t)0
                     );
+
                 }
 
                 break;
