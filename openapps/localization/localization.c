@@ -598,9 +598,16 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
             case ((int) Horiz):
                 loc.phi = get_period_us(curr_pulse.fall, next_pulse.rise) * sweep_velocity;
                 loc.r_horiz = distance_fit_horiz(get_period_us(next_pulse.rise, next_pulse.fall));
-
-                uint32_t periods_from_ref = (uint32_t)((float)((asn_pulses_local[i].fall*100 - sixtop_vars.ref_sync_pulse)) / (sixtop_vars.sync_pulse_period*100));
+                //code for computing asn based stuff, sometimes it is off by 16.6 ms, or one cycle at 60hz
+                uint32_t periods_from_ref = (uint32_t)((float)((asn_pulses_local[i+1].rise*100 - sixtop_vars.ref_sync_pulse)) / (sixtop_vars.sync_pulse_period*100));
                 uint32_t proj_sync_fall = sixtop_vars.ref_sync_pulse/100 + sixtop_vars.sync_pulse_period*periods_from_ref;
+                uint32_t desync;
+                if ((next_pulse.rise - curr_pulse.fall)/GPT_TICKS_PER_SC_TICK > (asn_pulses_local[i+1].rise - proj_sync_fall)){
+                    desync = (next_pulse.rise - curr_pulse.fall)/GPT_TICKS_PER_SC_TICK -  (asn_pulses_local[i+1].rise - proj_sync_fall);
+                } else{
+                    desync = (asn_pulses_local[i+1].rise - proj_sync_fall)*GPT_TICKS_PER_SC_TICK - (next_pulse.rise - curr_pulse.fall);
+                }
+
                 if(periods_from_ref < LIGHTHOUSE_KA_PERIODS){
                     openserial_printError(
                          COMPONENT_localization,
@@ -633,6 +640,25 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                          (errorparameter_t)(uint16_t) (((asn_pulses_local[i+1].rise - proj_sync_fall))),
                          (errorparameter_t)0
                     );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t) desync,
+                         (errorparameter_t)0
+                    );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t)  proj_sync_fall,
+                         (errorparameter_t)0
+                    );
+                    openserial_printError(
+                         COMPONENT_localization,
+                         ERR_NO_FREE_PACKET_BUFFER,
+                         (errorparameter_t)(uint16_t)  asn_pulses_local[i].fall,
+                         (errorparameter_t)0
+                    );
+
                     openserial_printError(
                          COMPONENT_localization,
                          ERR_NO_FREE_PACKET_BUFFER,
