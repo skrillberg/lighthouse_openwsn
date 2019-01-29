@@ -23,8 +23,8 @@
 #define SWEEP_PERIOD_US 8333.333333f
 #define DIODE_WIDTH_CM 0.45f // FIXME: measure for PCB
 
-#define LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD 546.133333f  //in 32khz ticks
-#define LIGHTHOUSE_KA_PERIODS 240
+#define LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD 546.13333333f  //in 32khz ticks
+#define LIGHTHOUSE_KA_PERIODS 3600
 #define CLOCK_SPEED_MHZ 32.0f
 #define GPT_TICKS_PER_SC_TICK 976.5625f
 //=========================== typedef =========================================
@@ -37,9 +37,13 @@ typedef struct {
    uint16_t              period;  ///< localization packet sending period>
    udp_resource_desc_t     desc;  ///< resource descriptor for this module, used to register at UDP stack
    uint32_t          sync_count;
+   uint32_t          sync_cycle_count;
+   uint32_t          desync_slope;
    uint32_t          start_of_slot; //records start of current slot with respect to localization timer 
    uint32_t          last_sync_time; //time of last horiz sync pulse
-   
+   uint32_t          sync_cycle_start; // time when the sync cycle started, used to calculate drift
+   opentimers_id_t      offsetTimerId;  ///< periodic timer which triggers transmission
+   float             slope_sum;     
 } localization_vars_t;
 
 typedef struct {

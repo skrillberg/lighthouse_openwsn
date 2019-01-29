@@ -27,10 +27,11 @@
 #include "headers/hw_ioc.h"
 #include "ioc.h"
 #include "sixtop.h"
+#include "schedule.h"
 
 //=========================== variables =======================================
 
-localization_vars_t localization_vars;
+volatile localization_vars_t localization_vars;
 
 static const uint8_t localization_payload[]    = "localization";
 static const uint8_t localization_dst_addr[]   = {
@@ -63,7 +64,7 @@ volatile bool testRan;
 volatile extern sixtop_vars_t sixtop_vars;
 extern ieee154e_vars_t ieee154e_vars;
 //=========================== prototypes ======================================
-
+void localization_offset_timer_cb(opentimers_id_t id);
 void localization_timer_cb(opentimers_id_t id);
 void localization_task_cb(void);
 void open_timer_init(void);
@@ -121,12 +122,15 @@ void open_timer_init(void){
         TIMER_PERIODIC,
         localization_timer_cb
     );
+
+    localization_vars.offsetTimerId = opentimers_create();
+
 }
 
 void precision_timers_init(void){
-    // SysCtrlPeripheralEnable(SYS_CTRL_PERIPH_GPT0); // enables timer0 module
+    SysCtrlPeripheralEnable(SYS_CTRL_PERIPH_GPT2); // enables timer1 module
     SysCtrlPeripheralEnable(SYS_CTRL_PERIPH_GPT3); // enables timer3 module
-
+    
     input_edge_timers_init();
 
     // TimerConfigure(gptmPeriodTimerBase, GPTIMER_CFG_PERIODIC_UP);
@@ -142,11 +146,19 @@ void input_edge_timers_init(void) {
     TimerConfigure(gptmEdgeTimerBase, GPTIMER_CFG_SPLIT_PAIR |
           GPTIMER_CFG_A_CAP_TIME_UP | GPTIMER_CFG_B_CAP_TIME_UP); // configures timer3a/b as 16-bit edge timers
 
+    TimerConfigure(GPTIMER2_BASE, GPTIMER_CFG_A_PERIODIC_UP ); // configures timer1a/b as 16-bit edge timers
+
     TimerPrescaleSet(gptmEdgeTimerBase,GPTIMER_A,0); // add prescaler to timer3a (24-bit)
     TimerPrescaleSet(gptmEdgeTimerBase,GPTIMER_B,0); // add prescaler to timer3b (24-bit)
 
-    TimerLoadSet(gptmEdgeTimerBase,GPTIMER_A,timer_cnt_16);
-    TimerLoadSet(gptmEdgeTimerBase,GPTIMER_B,timer_cnt_16);
+    TimerPrescaleSet(GPTIMER2_BASE,GPTIMER_A,0); // add prescaler to timer2a (24-bit)
+
+
+    TimerLoadSet(gptmEdgeTimerBase,GPTIMER_A,timer_cnt_24);
+    TimerLoadSet(gptmEdgeTimerBase,GPTIMER_B,timer_cnt_24);
+
+    TimerLoadSet(GPTIMER2_BASE,GPTIMER_A,timer_cnt_24);
+
 
     // FIXME: can we use the same gpio pin for both??
     IOCPinConfigPeriphInput(GPIO_A_BASE, GPIO_PIN_2, IOC_GPT3OCP1); // map gpio pin output to timer3a
@@ -169,8 +181,9 @@ void input_edge_timers_init(void) {
     ENABLE_INTERRUPTS();
 
     TimerEnable(gptmEdgeTimerBase,GPTIMER_BOTH);
+    TimerEnable(GPTIMER2_BASE,GPTIMER_A);
+    TimerSynchronize(GPTIMER0_BASE, GPTIMER_3A_SYNC | GPTIMER_3B_SYNC  | GPTIMER_2A_SYNC);
 
-    TimerSynchronize(gptmEdgeTimerBase, GPTIMER_3A_SYNC | GPTIMER_3B_SYNC);
 }
 
 void localization_sendDone(OpenQueueEntry_t* msg, owerror_t error) {
@@ -191,7 +204,8 @@ void localization_receive(OpenQueueEntry_t* pkt) {
 
 //record current time of start of tsch slot in localization ticks
 void loc_record_start_of_slot(void){
-    localization_vars.start_of_slot = TimerValueGet(gptmEdgeTimerBase, GPTIMER_B);
+    localization_vars.start_of_slot = TimerValueGet(GPTIMER2_BASE, GPTIMER_A);
+    TimerSynchronize(GPTIMER0_BASE, GPTIMER_3A_SYNC | GPTIMER_3B_SYNC  | GPTIMER_2A_SYNC);
 }
 
 //=========================== private =========================================
@@ -238,18 +252,43 @@ void mimsy_GPIO_falling_edge_handler(void) {
         ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
 
         //sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
-        /*   
-        if(pulses[modular_ptr].fall > localization_vars.start_of_slot){
-            sixtop_vars.sync_pulse_timer_offset = (pulses[modular_ptr].fall - localization_vars.start_of_slot)/977;
+        /*  
+        if(pulses[modular_ptr].rise > localization_vars.start_of_slot){
+            sixtop_vars.sync_pulse_timer_offset = (pulses[modular_ptr].rise - localization_vars.start_of_slot)/977;
         }else{
-            sixtop_vars.sync_pulse_timer_offset = ((timer_cnt_24 - localization_vars.start_of_slot) + pulses[modular_ptr].fall)/977;
+            sixtop_vars.sync_pulse_timer_offset = ((timer_cnt_24 - localization_vars.start_of_slot) + pulses[modular_ptr].rise)/977;
             
         }*/
+        /*
+        openserial_printError(
+             COMPONENT_localization,
+             ERR_NO_FREE_PACKET_BUFFER,
+             (errorparameter_t)(uint16_t)11111,
+             (errorparameter_t)0
+          );*/
+
+
+        /*
+        openserial_printError(
+             COMPONENT_localization,
+             ERR_NO_FREE_PACKET_BUFFER,
+             (errorparameter_t)(uint16_t)(pulses[modular_ptr].rise/32000),
+             (errorparameter_t)0
+          );*/
+
+
 
         //update the projected sync time
         //sixtop_vars.ref_sync_pulse += (uint32_t)(sixtop_vars.sync_pulse_period*100);    //multiplied by 100 to provide more sig figs
-
+        
         sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+        /*openserial_printError(
+             COMPONENT_localization,
+             ERR_NO_FREE_PACKET_BUFFER,
+             (errorparameter_t)(uint16_t)(TimerValueGet(GPTIMER2_BASE, GPTIMER_A)/32000),
+             (errorparameter_t)0
+          );*/
+
         uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
                     + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
                     + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
@@ -258,7 +297,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
         sixtop_vars.current_sync_pulse_time = curr_time;
         asn_pulses[modular_ptr].fall = curr_time;
-        asn_pulses[modular_ptr].rise = (uint32_t)((float)curr_time - (period*32/967.5625)); //curr_time is in 32.768 khz tick units
+        asn_pulses[modular_ptr].rise = (uint32_t)((float)curr_time - (period*32/976.5625)); //curr_time is in 32.768 khz tick units
 
 
            /*
@@ -307,7 +346,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
                      (errorparameter_t)(uint16_t)((float)(curr_time-last_time)/(float)(localization_vars.sync_count + 1)*100),
                      (errorparameter_t)0
                   );*/ 
-
+                 sixtop_vars.sync_pulse_period = LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD;
             }else{
 	            sixtop_vars.sync_pulse_period = LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD;
                 localization_vars.sync_count += 1;
@@ -332,18 +371,82 @@ void mimsy_GPIO_falling_edge_handler(void) {
     pulse_count += 1;
 
 }
+void localization_offset_timer_cb(opentimers_id_t id){
 
+    scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
+}
 /**
 \note timer fired, but we don't want to execute task in ISR mode instead, push
    task to scheduler with CoAP priority, and let scheduler take care of it.
 */
 void localization_timer_cb(opentimers_id_t id){
     // count += 1;
+    /*
+    scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
+
+    if((slot->type != CELLTYPE_SERIALRX) && (schedule_getNumOfSlotsByType(CELLTYPE_TXRX) != 0)){
+        uint8_t slots_from_rx = schedule_getNumOfSlotsByType(CELLTYPE_TXRX) - slot->slotOffset;
+        opentimers_scheduleIn(
+            localization_vars.offsetTimerId,
+            17 + slots_from_rx * ieee154e_vars.slotDuration,
+            TIME_MS,
+            TIMER_ONESHOT,
+            localization_offset_timer_cb
+        ); 
+       openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) ieee154e_vars.slotDuration,
+         (errorparameter_t)0
+       );
+
+       openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) schedule_getNumberOfFreeEntries(),
+         (errorparameter_t)0
+       );
+       openserial_printError(
+         COMPONENT_localization,
+         ERR_NO_FREE_PACKET_BUFFER,
+         (errorparameter_t)(uint16_t) 7777,
+         (errorparameter_t)0
+       );
+       
+    }else{
     scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
     // SCHEDULER_WAKEUP();
+    }
+    */
+    scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
 }
 
 void localization_task_cb(void) {
+
+    scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
+
+    /*
+    openserial_printError(
+     COMPONENT_localization,
+     ERR_NO_FREE_PACKET_BUFFER,
+     (errorparameter_t)(uint16_t) ( 11111),
+     (errorparameter_t)0
+   );
+   openserial_printError(
+     COMPONENT_localization,
+     ERR_NO_FREE_PACKET_BUFFER,
+     (errorparameter_t)(uint16_t) ( slot->type),
+     (errorparameter_t)0
+   );
+   openserial_printError(
+     COMPONENT_localization,
+     ERR_NO_FREE_PACKET_BUFFER,
+     (errorparameter_t)(uint16_t) ( schedule_getMaxActiveSlots()),
+     (errorparameter_t)0
+   );
+    */
+
+
    OpenQueueEntry_t*    pkt;
    // uint8_t              asnArray[5];
 
@@ -601,7 +704,67 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                 //code for computing asn based stuff, sometimes it is off by 16.6 ms, or one cycle at 60hz
                 uint32_t periods_from_ref = (uint32_t)((float)((asn_pulses_local[i+1].rise*100 - sixtop_vars.ref_sync_pulse)) / (sixtop_vars.sync_pulse_period*100));
                 uint32_t proj_sync_fall = sixtop_vars.ref_sync_pulse/100 + sixtop_vars.sync_pulse_period*periods_from_ref;
+
+
                 uint32_t desync;
+                int32_t difference;
+                difference = -proj_sync_fall + asn_pulses_local[i].fall; //difference is projected - actual
+                float time_since_sync = asn_pulses_local[i].fall - sixtop_vars.ref_sync_pulse/100; //need to divide by 100x 
+                uint32_t corrected_proj_sync = (uint32_t)(proj_sync_fall +  localization_vars.slope_sum/32768/30.51 * time_since_sync/localization_vars.sync_cycle_count);
+                 
+                float slope = difference * 30.51 /(time_since_sync)*32768; //in us/s
+
+                if(periods_from_ref > 60 && (slope >20 ) && slope <40){
+                    localization_vars.slope_sum += slope;
+                    localization_vars.sync_cycle_count += 1;
+                }
+                /*
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) (loc.phi * 1000),
+                     (errorparameter_t)0
+                );
+
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t)(localization_vars.slope_sum/32768/30.51 * time_since_sync/localization_vars.sync_cycle_count ),
+                     (errorparameter_t)0
+                );
+
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t)(localization_vars.slope_sum/localization_vars.sync_cycle_count ),
+                     (errorparameter_t)0
+                );
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t)(corrected_proj_sync ),
+                     (errorparameter_t)0
+                );
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t) (proj_sync_fall),
+                     (errorparameter_t)0
+                );
+
+
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t)(asn_pulses_local[i].fall),
+                     (errorparameter_t)0
+                );
+                openserial_printError(
+                     COMPONENT_localization,
+                     ERR_NO_FREE_PACKET_BUFFER,
+                     (errorparameter_t)(uint16_t)(22222),
+                     (errorparameter_t)0
+                );*/
                 if ((next_pulse.rise - curr_pulse.fall)/GPT_TICKS_PER_SC_TICK > (asn_pulses_local[i+1].rise - proj_sync_fall)){
                     desync = (next_pulse.rise - curr_pulse.fall)/GPT_TICKS_PER_SC_TICK -  (asn_pulses_local[i+1].rise - proj_sync_fall);
                 } else{
@@ -609,6 +772,27 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                 }
 
                 if(periods_from_ref < LIGHTHOUSE_KA_PERIODS){
+                    union {
+                        uint32_t data[8];
+                        uint8_t bytes[32];
+                    } sync_data;
+                    union { 
+                        uint8_t bytes[4];
+                        float    float_rep;
+                    } float_un;
+
+                    sync_data.data [0] = periods_from_ref;
+                    sync_data.data[1] = proj_sync_fall;
+                    sync_data.data[2] =  asn_pulses_local[i].fall;
+                    sync_data.data[3] = (uint32_t)(loc.phi*1000);
+                    sync_data.data[4] = (uint32_t) (((asn_pulses_local[i+1].rise - proj_sync_fall)*GPT_TICKS_PER_SC_TICK) * sweep_velocity/32.0*1000);  
+                    sync_data.data[5] = (uint32_t) localization_vars.slope_sum/localization_vars.sync_cycle_count; 
+                    sync_data.data[6] = (uint32_t) corrected_proj_sync;
+                    sync_data.data[7] = (uint32_t) (((asn_pulses_local[i+1].rise - corrected_proj_sync)*GPT_TICKS_PER_SC_TICK) * sweep_velocity/32.0*1000);  
+                    openserial_printData(sync_data.bytes, 32);
+                    
+
+                    /*
                     openserial_printError(
                          COMPONENT_localization,
                          ERR_NO_FREE_PACKET_BUFFER,
@@ -665,7 +849,7 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                          (errorparameter_t)(uint16_t) 11111,
                          (errorparameter_t)0
                     );
-
+                    */
                 }
 
                 break;
