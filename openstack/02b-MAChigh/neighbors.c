@@ -11,6 +11,7 @@
 
 static neighbors_vars_t neighbors_vars;
 
+
 //=========================== prototypes ======================================
 
 void registerNewNeighbor(
@@ -572,7 +573,35 @@ void neighbors_setLocation(open_addr_t* l2_src,
 
 			/*printf("location from set location: %f, %f, %f\n",(float)(neighbors_vars.neighbors[i].location.x)/10,
 																				(float)(neighbors_vars.neighbors[i].location.y)/10,
-																				(float)(neighbors_vars.neighbors[i].location.z)/10);*/
+		 																		(float)(neighbors_vars.neighbors[i].location.z)/10);*/
+        //for neighbor update rate
+        if(neighbors_vars.neighbor_update_last_time[i].bytes0and1 >= 0){
+            uint8_t asn_array[5];
+            asn_t asn_struct;
+            neighbors_vars.neighbor_update_count[i]++;
+
+             ieee154e_getAsn(asn_array);
+             ieee154e_orderToASNStructure(asn_array,&asn_struct);
+             if(neighbors_vars.neighbor_update_count[i] >= 10){
+                neighbors_vars.neighbor_update_count[i] = 0;
+                int16_t diff =  ieee154e_computeAsnDiff(&asn_struct,&neighbors_vars.neighbor_update_last_time[i]) ;   
+                ieee154e_orderToASNStructure(asn_array,&neighbors_vars.neighbor_update_last_time[i] );  
+                union{
+                    int16_t integer;
+                    uint8_t bytes[2];
+                } diff_un;
+                diff_un.integer = diff;
+                uint8_t neighbor_data[4];
+                neighbor_data[0] = 222;
+                neighbor_data[1] = (*l2_src).addr_64b[7];
+                neighbor_data[2] = diff_un.bytes[0];
+                neighbor_data[3] = diff_un.bytes[1];
+                openserial_printData(neighbor_data, 4);
+             }
+
+        }
+
+
 		}
 	}
 }

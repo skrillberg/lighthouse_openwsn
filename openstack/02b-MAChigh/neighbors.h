@@ -10,6 +10,7 @@
 #include "opendefs.h"
 #include "icmpv6rpl.h"
 
+
 //=========================== define ==========================================
 
 #define MAXPREFERENCE             2
@@ -49,6 +50,11 @@ typedef struct {
    neighborRow_t        neighbors[MAXNUMNEIGHBORS];
    dagrank_t            myDAGrank;
    uint8_t              debugRow;
+    //for neighbor update rate over 10 update window
+    uint32_t                     neighbor_update_rate[MAXNUMNEIGHBORS];
+    uint32_t                     neighbor_update_count[MAXNUMNEIGHBORS];
+    asn_t                       neighbor_update_last_time[MAXNUMNEIGHBORS];
+
 } neighbors_vars_t;
 
 //=========================== prototypes ======================================

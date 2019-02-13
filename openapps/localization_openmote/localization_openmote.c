@@ -1,5 +1,5 @@
 #include "opendefs.h"
-#include "localization.h"
+#include "localization_openmote.h"
 #include "openqueue.h"
 #include "openserial.h"
 #include "packetfunctions.h"
@@ -30,12 +30,6 @@
 #include "schedule.h"
 #include "servo.c"
 
-//mimsy only
-#include "accel_mimsy.h"
-#include "inv_mpu.h"
-#include "inv_mpu_dmp_motion_driver.h"
-#include "ml_math_func.h"
-#include <math.h>
 
 //=========================== variables =======================================
 
@@ -84,7 +78,7 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 #define GYRO_FSR			2000 //gyro full scale range in deg/s
 //=========================== public ==========================================
 
-void localization_init(void) {
+void localization_openmote_init(void) {
 
     // clear local variables
     memset(&localization_vars,0,sizeof(localization_vars_t));
@@ -119,48 +113,7 @@ void localization_init(void) {
     open_timer_init();
     motor_init(0,1,25,GPIO_D_BASE,GPIO_PIN_1);
 
-    //mimsy specific imu code
-    struct int_param_s placeholder;
-    mpu_init(&placeholder);
-   // mimsyIMUInit();
-    mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO); //turn on sensor
-    mpu_set_accel_fsr(16); //set fsr for accel
-    mpu_set_gyro_fsr(GYRO_FSR); //set fsr for accel
-   // mimsyDmpBegin();
-    //mpu_lp_accel_mode(1);
-    //mpu_lp_motion_interrupt(100, 300,20);
-	float fquats[4] = {0,0,0,0};
-    long quat[4];
-	short gyro[3] = {0,0,0};
-	short accel[3] = {0,0,0};
-    short sensors;
-    unsigned char more;
-    unsigned long timestamp;
-    uint16_t dur = ieee154e_getSlotDuration();
-    //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
-		//mimsyPrintf("\n dmp fifo error");
-	//}
-	//*********************euler angle conversion*****************************************************************
-   //pitch control
-   fquats[0]=(float)quat[0]/(float)0x40000000;
-   fquats[1]=(float)quat[1]/(float)0x40000000;
-   fquats[2]=(float)quat[2]/(float)0x40000000;
-   fquats[3]=(float)quat[3]/(float)0x40000000;
-   /*
-   //mag = sqrtf( fquats[1] * fquats[1] + fquats[2] * fquats[2] + fquats[3] * fquats[3]);
-   inv_q_norm4(fquats);
-   urocket_vars.pitch_last = urocket_vars.pitch.flt; //save previous state
-   urocket_vars.pitch.flt = asinf( 2*(fquats[0]*fquats[2]-fquats[3]*fquats[1])); //computes sin of pitch
 
-   //gyro yaw
-   urocket_vars.yaw_last = urocket_vars.yaw.flt;
-   urocket_vars.yaw.flt = atan2f(2*(fquats[0] * fquats[3] + fquats[1] * fquats[2]),1 - 2*(fquats[2]*fquats[2] + fquats[3]*fquats[3]));
-
-   //roll control
-   urocket_vars.roll_last = urocket_vars.roll.flt;
-   urocket_vars.roll.flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
-   //mimsyPrintf("\n Roll: %d. Pitch: %d, Yaw: %d",(int)(roll*100),(int)(pitch*100), (int)(yaw*100));
-    */
 }
 
 void open_timer_init(void){

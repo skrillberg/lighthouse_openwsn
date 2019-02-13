@@ -121,6 +121,7 @@ typedef struct {
    float 			sync_pulse_period;
    float            sync_pulse_period_offset;
    uint32_t                     viveTimerStartOfSlotReference;
+
 } sixtop_vars_t;
 
 //=========================== prototypes ======================================

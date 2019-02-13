@@ -67,7 +67,7 @@ typedef enum {
 
 //=========================== prototypes ======================================
 
-void localization_init(void);
+void localization_openmote_init(void);
 void localization_sendDone(OpenQueueEntry_t* msg, owerror_t error);
 void localization_receive(OpenQueueEntry_t* msg);
 void loc_record_start_of_slot(void); 

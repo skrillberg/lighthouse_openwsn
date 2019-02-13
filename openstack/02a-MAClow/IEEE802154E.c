@@ -50,6 +50,7 @@ ieee154e_stats_t   ieee154e_stats;
 ieee154e_dbg_t     ieee154e_dbg;
 int serialrx_flag = 0;
 
+
 //=========================== prototypes ======================================
 
 // SYNCHRONIZING
@@ -2571,6 +2572,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                 //openserial_printInfo(COMPONENT_IEEE802154E,ERR_SYNCHRONIZED,
                    //   (errorparameter_t)ieee154e_vars.slotOffset,
                     //  (errorparameter_t)*((uint8_t*)(pkt->payload+ptr+1))<<8);
+                /*
                 openserial_printError(
                     COMPONENT_IEEE802154E,
                     ERR_NO_FREE_PACKET_BUFFER,
@@ -2588,7 +2590,19 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                     ERR_NO_FREE_PACKET_BUFFER,
                     (errorparameter_t)(z),
                     (errorparameter_t)(pkt->length)
-                );
+                );*/
+
+                union {
+                    uint32_t data[5];
+                    uint8_t bytes[20];
+                } neighbor_data;
+                neighbor_data.data[0] = 12345;
+                neighbor_data.data[1] = (pkt->l2_nextORpreviousHop).addr_64b[7];
+                neighbor_data.data[2] = x;
+                neighbor_data.data[3] = y;
+                neighbor_data.data[4] = z;
+
+                //openserial_printData(neighbor_data.bytes, 20);
                 break;
             default:
               //printf("unsupported iel\n");
