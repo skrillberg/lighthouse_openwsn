@@ -29,6 +29,7 @@
 #include "sixtop.h"
 #include "schedule.h"
 #include "servo.c"
+#include "uart_mimsy.h"
 
 //mimsy only
 #include "accel_mimsy.h"
@@ -79,7 +80,7 @@ void open_timer_init(void);
 void precision_timers_init(void);
 void input_edge_timers_init(void);
 void mimsy_GPIO_falling_edge_handler(void);
-
+void calc_eulers(float * quats, euler_t * roll, euler_t * pitch, euler_t * yaw);
 location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 #define GYRO_FSR			2000 //gyro full scale range in deg/s
 //=========================== public ==========================================
@@ -121,12 +122,12 @@ void localization_init(void) {
 
     //mimsy specific imu code
     struct int_param_s placeholder;
-    mpu_init(&placeholder);
-   // mimsyIMUInit();
+   // mpu_init(&placeholder);
+    mimsyIMUInit();
     mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO); //turn on sensor
     mpu_set_accel_fsr(16); //set fsr for accel
     mpu_set_gyro_fsr(GYRO_FSR); //set fsr for accel
-   // mimsyDmpBegin();
+    mimsyDmpBegin(); //this will cause a crash if the delay in i2c reads is too long, 1 ms was too long
     //mpu_lp_accel_mode(1);
     //mpu_lp_motion_interrupt(100, 300,20);
 	float fquats[4] = {0,0,0,0};
@@ -137,8 +138,9 @@ void localization_init(void) {
     unsigned char more;
     unsigned long timestamp;
     uint16_t dur = ieee154e_getSlotDuration();
+    uartMimsyInit(); //initial mimsy printf
     //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
-		//mimsyPrintf("\n dmp fifo error");
+    mimsyPrintf(" hello world\n");
 	//}
 	//*********************euler angle conversion*****************************************************************
    //pitch control
@@ -161,6 +163,22 @@ void localization_init(void) {
    urocket_vars.roll.flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
    //mimsyPrintf("\n Roll: %d. Pitch: %d, Yaw: %d",(int)(roll*100),(int)(pitch*100), (int)(yaw*100));
     */
+}
+
+void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
+   inv_q_norm4(fquats);
+
+   
+   pitch->flt = asinf( 2*(fquats[0]*fquats[2]-fquats[3]*fquats[1])); //computes sin of pitch
+
+   //gyro yaw
+
+   yaw->flt = atan2f(2*(fquats[0] * fquats[3] + fquats[1] * fquats[2]),1 - 2*(fquats[2]*fquats[2] + fquats[3]*fquats[3]));
+
+   //roll control
+
+   roll->flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
+   mimsyPrintf("\n Roll: %d. Pitch: %d, Yaw: %d",(int)(roll->flt*100),(int)(pitch->flt*100), (int)(yaw->flt*100));
 }
 
 void open_timer_init(void){
@@ -477,6 +495,37 @@ void localization_task_cb(void) {
 
     scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
 
+	float fquats[4] = {0,0,0,0};
+    long quat[4];
+	short gyro[3] = {0,0,0};
+	short accel[3] = {0,0,0};
+    short sensors;
+    unsigned char more;
+    unsigned long timestamp;
+    dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more);
+    //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
+    mimsyPrintf(" dmp fifo error\n");
+	//}
+    //convert quats from hardware units to float
+    fquats[0]=(float)quat[0]/(float)0x40000000;
+    fquats[1]=(float)quat[1]/(float)0x40000000;
+    fquats[2]=(float)quat[2]/(float)0x40000000;
+    fquats[3]=(float)quat[3]/(float)0x40000000;
+
+    euler_t roll;
+    euler_t pitch;
+    euler_t yaw;
+    calc_eulers(fquats, &roll, &pitch , &yaw);
+    localization_vars.orientations[localization_vars.orientation_idx].orientation = (int32_t)(yaw.flt*1000); //in milliradians
+    localization_vars.orientation_idx++;
+    if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N){
+       localization_vars.orientation_idx = 0;
+    }
+ 
+    IMUData data;
+    mimsyIMURead6Dof(&data);
+
+    mimsyPrintf("dmp data: ");
     /*
     openserial_printError(
      COMPONENT_localization,

@@ -27,9 +27,19 @@
 #define LIGHTHOUSE_KA_PERIODS 3600
 #define CLOCK_SPEED_MHZ 32.0f
 #define GPT_TICKS_PER_SC_TICK 976.5625f
+#define ORIENTATION_SAMPLE_N  25
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
+typedef struct {
+    uint32_t time;
+    int32_t orientation;
+} orientation_map_euler_t;
+
+typedef struct {
+    uint32_t time;
+    float quats[4];
+} orientation_map_quaternion_t;
 
 typedef struct {
    opentimers_id_t      timerId;  ///< periodic timer which triggers transmission
@@ -43,7 +53,10 @@ typedef struct {
    uint32_t          last_sync_time; //time of last horiz sync pulse
    uint32_t          sync_cycle_start; // time when the sync cycle started, used to calculate drift
    opentimers_id_t      offsetTimerId;  ///< periodic timer which triggers transmission
-   float             slope_sum;     
+   float             slope_sum; 
+   orientation_map_euler_t   orientations[ORIENTATION_SAMPLE_N];
+   uint8_t          orientation_idx;
+       
 } localization_vars_t;
 
 typedef struct {
@@ -51,6 +64,14 @@ typedef struct {
    uint32_t                fall;
    int                     type; // -1 for unclassified, 0 for Sync, 1 for Horiz, 2 for Vert
 } pulse_t;
+
+ 
+typedef union {
+     float flt;
+     unsigned char bytes[4];
+   } euler_t;
+
+
 
 typedef struct {
 	float                    phi;
