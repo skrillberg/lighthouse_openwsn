@@ -503,6 +503,18 @@ void localization_task_cb(void) {
     unsigned char more;
     unsigned long timestamp;
     dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more);
+
+    uint8_t asn[5];
+    ieee154e_getAsn(asn);      
+    uint32_t asn_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+
+    uint32_t curr_time = asn[3] * 16777216 * ieee154e_vars.slotDuration 
+                + asn[2] * 65536 * ieee154e_vars.slotDuration 
+                + asn[1] * 256 * ieee154e_vars.slotDuration 
+                + asn[0] * ieee154e_vars.slotDuration
+                + asn_offset; 
+
+
     //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
     mimsyPrintf(" dmp fifo error\n");
 	//}
@@ -516,12 +528,16 @@ void localization_task_cb(void) {
     euler_t pitch;
     euler_t yaw;
     calc_eulers(fquats, &roll, &pitch , &yaw);
+
     localization_vars.orientations[localization_vars.orientation_idx].orientation = (int32_t)(yaw.flt*1000); //in milliradians
+    localization_vars.orientations[localization_vars.orientation_idx].time = curr_time; //save time
     localization_vars.orientation_idx++;
     if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N){
        localization_vars.orientation_idx = 0;
     }
+
  
+
     IMUData data;
     mimsyIMURead6Dof(&data);
 
