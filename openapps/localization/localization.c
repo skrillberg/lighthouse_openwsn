@@ -532,6 +532,7 @@ void localization_task_cb(void) {
     localization_vars.orientations[localization_vars.orientation_idx].orientation = (int32_t)(yaw.flt*1000); //in milliradians
     localization_vars.orientations[localization_vars.orientation_idx].time = curr_time; //save time
     localization_vars.orientation_idx++;
+
     if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N){
        localization_vars.orientation_idx = 0;
     }
