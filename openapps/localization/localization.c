@@ -30,6 +30,8 @@
 #include "schedule.h"
 #include "servo.c"
 #include "uart_mimsy.h"
+#include "IEEE802154.h"
+#include "IEEE802154_security.h"
 
 //mimsy only
 #include "accel_mimsy.h"
@@ -83,6 +85,7 @@ void mimsy_GPIO_falling_edge_handler(void);
 void calc_eulers(float * quats, euler_t * roll, euler_t * pitch, euler_t * yaw);
 location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 #define GYRO_FSR			2000 //gyro full scale range in deg/s
+void orientation_sendEB(void);
 //=========================== public ==========================================
 
 void localization_init(void) {
@@ -528,13 +531,15 @@ void localization_task_cb(void) {
     euler_t pitch;
     euler_t yaw;
     calc_eulers(fquats, &roll, &pitch , &yaw);
-
-    localization_vars.orientations[localization_vars.orientation_idx].orientation = (int32_t)(yaw.flt*1000); //in milliradians
-    localization_vars.orientations[localization_vars.orientation_idx].time = curr_time; //save time
+    
+    //save orientations and timestamps 
+    localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(yaw.flt*1000); //in milliradians
+    localization_vars.orientations[localization_vars.orientation_idx].fields.time = curr_time; //save time
     localization_vars.orientation_idx++;
 
     if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N){
        localization_vars.orientation_idx = 0;
+        orientation_sendEB();
     }
 
  
@@ -1052,4 +1057,108 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
           );*/
 
     return loc;
+}
+
+/**
+\brief Send an EB.
+
+This is one of the MAC management tasks. This function inlines in the
+timers_res_fired() function, but is declared as a separate function for better
+readability of the code.
+*/
+port_INLINE void orientation_sendEB() {
+    OpenQueueEntry_t* eb;
+    uint8_t     i;
+    uint8_t     eb_len;
+    uint16_t    temp16b;
+   
+   
+    // if I get here, I will send an EB
+    
+    // get a free packet buffer
+    eb = openqueue_getFreePacketBuffer(COMPONENT_localization);
+    if (eb==NULL) {
+        openserial_printError(
+            COMPONENT_SIXTOP,
+            ERR_NO_FREE_PACKET_BUFFER,
+            (errorparameter_t)0,
+            (errorparameter_t)0
+        );
+        return;
+    }
+   
+    // declare ownership over that packet
+    eb->creator = COMPONENT_SIXTOP;
+    eb->owner   = COMPONENT_SIXTOP;
+    
+
+    //reserve space for location IE. This should be before all other reserve
+    //header operation because otherwise it will not be appended to the end of the IEs
+
+    uint16_t loc_len = 88;   //length is payload plus two bytes of descriptor stuff
+    packetfunctions_reserveHeaderSize(eb,loc_len); //undid to get working
+    temp16b = IEEE802154E_DESC_TYPE_SHORT | 
+              (0x49 << IEEE802154E_DESC_SUBID_SHORT_MLME_IE_SHIFT) | 
+               (loc_len-2) ;
+
+  //printf("%d \n",temp16b);
+    //sixtop_vars.location.x = 15;
+    /*openserial_printError(
+    COMPONENT_SIXTOP,
+    ERR_NO_FREE_PACKET_BUFFER,
+    (errorparameter_t)((uint8_t)(sixtop_vars.location.x & 0x00ff)),
+    (errorparameter_t)0
+);*/
+
+    uint8_t loc_stream[88]; //6 bytes in the beginning for asn
+
+    loc_stream[0] = (uint8_t)(temp16b & 0x00ff);
+    loc_stream[1] = (uint8_t)((temp16b & 0xff00)>>8);
+    int tuple = 0;
+    for(tuple = 0; tuple < (loc_len-8)/sizeof(localization_vars.orientations[0].bytes);tuple++){
+        int byte = 0;
+        int size = sizeof(localization_vars.orientations[0].bytes);
+        for(byte = 0; byte<sizeof(localization_vars.orientations[0].bytes); byte++){
+            loc_stream[8+tuple*size+byte] = localization_vars.orientations[tuple].bytes[byte];
+        }
+    }
+    
+
+    //load location header
+    for (i=0;i<loc_len;i++){
+        eb->payload[i]   = loc_stream[i]; //undid to get working
+	  //printf("%x\n",eb->payload[i]);
+    }
+
+    packetfunctions_reserveHeaderSize(eb,2); //2 bytes for header payload descripter and 6 empty bytes for asn
+    temp16b = loc_len | IEEE802154E_PAYLOAD_DESC_GROUP_ID_MLME | IEEE802154E_PAYLOAD_DESC_TYPE_MLME;
+    eb->payload[0] = (uint8_t)(temp16b & 0x00ff);
+    eb->payload[1] = (uint8_t)((temp16b & 0xff00)>>8);
+
+
+    // Keep a pointer to where the ASN will be
+    // Note: the actual value of the current ASN and JP will be written by the
+    //    IEEE802.15.4e when transmitting
+    eb->l2_ASNpayload               = &eb->payload[EB_ASN0_OFFSET]; 
+  
+    // some l2 information about this packet
+    eb->l2_frameType                     = IEEE154_TYPE_BEACON;
+    eb->l2_nextORpreviousHop.type        = ADDR_16B;
+    eb->l2_nextORpreviousHop.addr_16b[0] = 0xff;
+    eb->l2_nextORpreviousHop.addr_16b[1] = 0xff;
+    
+    //I has an IE in my payload
+    eb->l2_payloadIEpresent = TRUE;
+
+    // set l2-security attributes
+    eb->l2_securityLevel   = IEEE802154_SECURITY_LEVEL_BEACON;
+    eb->l2_keyIdMode       = IEEE802154_SECURITY_KEYIDMODE;
+    eb->l2_keyIndex        = IEEE802154_security_getBeaconKeyIndex();
+
+    // put in queue for MAC to handle
+    sixtop_send_internal(eb,eb->l2_payloadIEpresent);
+   
+    // I'm now busy sending an EB
+    sixtop_vars.busySendingEB = TRUE;
+    
 }

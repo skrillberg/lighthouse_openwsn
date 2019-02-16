@@ -27,14 +27,19 @@
 #define LIGHTHOUSE_KA_PERIODS 3600
 #define CLOCK_SPEED_MHZ 32.0f
 #define GPT_TICKS_PER_SC_TICK 976.5625f
-#define ORIENTATION_SAMPLE_N  25
+#define ORIENTATION_SAMPLE_N  10
+#define ORIENTATION_SIZE 8
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
-typedef struct {
-    uint32_t time;
-    int32_t orientation;
-} orientation_map_euler_t;
+typedef union  {
+    struct {
+        uint32_t time;
+        int32_t orientation;
+    } fields;
+
+    uint8_t bytes[8];
+}orientation_map_euler_t;
 
 typedef struct {
     uint32_t time;
@@ -55,6 +60,7 @@ typedef struct {
    opentimers_id_t      offsetTimerId;  ///< periodic timer which triggers transmission
    float             slope_sum; 
    orientation_map_euler_t   orientations[ORIENTATION_SAMPLE_N];
+   orientation_map_euler_t   orientations_tmp[ORIENTATION_SAMPLE_N];
    uint8_t          orientation_idx;
        
 } localization_vars_t;

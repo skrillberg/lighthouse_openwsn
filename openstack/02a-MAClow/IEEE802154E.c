@@ -49,7 +49,7 @@ ieee154e_vars_t    ieee154e_vars;
 ieee154e_stats_t   ieee154e_stats;
 ieee154e_dbg_t     ieee154e_dbg;
 int serialrx_flag = 0;
-
+volatile extern localization_vars_t localization_vars;
 
 //=========================== prototypes ======================================
 
@@ -2604,6 +2604,19 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
 
                 //openserial_printData(neighbor_data.bytes, 20);
                 break;
+            case 0x49:
+            	//this is an orientation tuple eb
+
+
+                for(asdf = 0; asdf < (sublen)/ORIENTATION_SIZE;asdf++){
+                    int byte = 0;
+                    for(byte = 0; byte<ORIENTATION_SIZE; byte++){
+                    	//plus 6 is to bypass the asn write in the beginning of the eb
+                        localization_vars.orientations_tmp[asdf].bytes[byte] = *(uint8_t*)((pkt->payload)+ptr+asdf*ORIENTATION_SIZE + byte + 6);
+                    }
+                }
+                break;
+
             default:
               //printf("unsupported iel\n");
                 // unsupported IE type, skip the ie
