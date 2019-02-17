@@ -2615,6 +2615,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                         localization_vars.orientations_tmp[asdf].bytes[byte] = *(uint8_t*)((pkt->payload)+ptr+asdf*ORIENTATION_SIZE + byte + 6);
                     }
                 }
+                localization_vars.orientation_received = 1;
                 break;
 
             default:

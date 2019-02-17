@@ -637,7 +637,7 @@ void timer_sixtop_sendEb_fired(void) {
     
     // send EBs on a portion of the minimal cells not exceeding 1/(3(N+1))
     // https://tools.ietf.org/html/draft-chang-6tisch-msf-01#section-2
-    if(openrandom_get16b()<0xffff/((neighbors_getNumNeighbors()+1))){
+    if(openrandom_get16b()<0xffff/(3*(neighbors_getNumNeighbors()+1))){
         sixtop_sendEB();
     }
 

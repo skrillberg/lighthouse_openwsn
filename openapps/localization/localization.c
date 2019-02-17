@@ -86,6 +86,7 @@ void calc_eulers(float * quats, euler_t * roll, euler_t * pitch, euler_t * yaw);
 location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 #define GYRO_FSR			2000 //gyro full scale range in deg/s
 void orientation_sendEB(void);
+void orientation_lookup_task(void);
 //=========================== public ==========================================
 
 void localization_init(void) {
@@ -317,7 +318,21 @@ void mimsy_GPIO_falling_edge_handler(void) {
     
 
 
+    ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
 
+
+        
+        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+
+
+        uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
+                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
+                    + sixtop_vars.sync_pulse_timer_offset; 
+
+        localization_vars.orientation_pulse_time = curr_time;
+        localization_vars.pulse_detected = 1;
 
     //only counts horizontal sync bits
     if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US) && ((sync_bits(period) & 0b001) + 1 == 1)){
@@ -493,9 +508,33 @@ void localization_timer_cb(opentimers_id_t id){
     */
     scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
 }
+void orientation_lookup_task(void){
+    if(localization_vars.pulse_detected && localization_vars.orientation_received){
+        uint8_t idx;
+        uint8_t found;
+        found = 0;
+        for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
+            //search for the nearest time in the table
+            if(localization_vars.orientation_pulse_time > localization_vars.orientations_tmp[idx].fields.time && localization_vars.orientation_pulse_time < localization_vars.orientations_tmp[idx+1].fields.time){
+                if(idx < ORIENTATION_SAMPLE_N -1){
+                	int32_t orientation_diff = localization_vars.orientations_tmp[idx+1].fields.orientation -  localization_vars.orientations_tmp[idx].fields.orientation;
+                	uint32_t time_diff = (localization_vars.orientations_tmp[idx+1].fields.time -  localization_vars.orientations_tmp[idx].fields.time +1);
+                    float interp_slope = ((float)orientation_diff)/(1+time_diff);
+                    int32_t orientation =   localization_vars.orientations_tmp[idx].fields.orientation + 
+                                            interp_slope*(localization_vars.orientation_pulse_time - localization_vars.orientations_tmp[idx].fields.time) ;
+                    found = 1;
+                    break;
+                }
+            }
+        found = 0;
+        localization_vars.pulse_detected = 0;
+        localization_vars.orientation_received = 0;
+        }
+    }
 
+}
 void localization_task_cb(void) {
-
+    orientation_lookup_task();
     scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
 
 	float fquats[4] = {0,0,0,0};
@@ -645,6 +684,7 @@ void localization_task_cb(void) {
    // if you get here, send a packet
 
    // get a free packet buffer
+    /*
    pkt = openqueue_getFreePacketBuffer(COMPONENT_localization);
    if (pkt==NULL) {
       openserial_printError(
@@ -735,6 +775,7 @@ void localization_task_cb(void) {
    } else {
       count += 1;
    }
+    */
 }
 
 float get_period_us_32(uint32_t start, uint32_t end) {

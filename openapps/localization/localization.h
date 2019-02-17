@@ -13,7 +13,7 @@
 
 //=========================== define ==========================================
 
-#define LOCALIZATION_PERIOD_MS 1000
+#define LOCALIZATION_PERIOD_MS 200
 #define PULSE_TRACK_COUNT 5
 
 #define MIN_SYNC_PERIOD_US 52
@@ -62,6 +62,9 @@ typedef struct {
    orientation_map_euler_t   orientations[ORIENTATION_SAMPLE_N];
    orientation_map_euler_t   orientations_tmp[ORIENTATION_SAMPLE_N];
    uint8_t          orientation_idx;
+   uint8_t          pulse_detected;     //state variable: have i seen a laser pulse
+   uint8_t          orientation_received;   //state variable: have i received an orientation EB
+   uint32_t         orientation_pulse_time;
        
 } localization_vars_t;
 
