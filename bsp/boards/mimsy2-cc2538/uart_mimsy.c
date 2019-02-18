@@ -60,11 +60,11 @@ void uartMimsyInit(){
     // frequency.  This could be also be a variable or hard coded value
     // instead of a function call.
     //
-   // UARTConfigSetExpClk(UART0_BASE, SysCtrlClockGet(), 115200,
-                     //   (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
-                     //    UART_CONFIG_PAR_NONE));
+    UARTConfigSetExpClk(UART1_BASE, SysCtrlClockGet(), 115200,
+                        (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
+                         UART_CONFIG_PAR_NONE));
   //  UARTEnable(UART0_BASE);
-    UARTStdioInitExpClk(0,115200*2); //adjusted to account for clock difference caused by openwsn clock scheme
+    UARTStdioInitExpClk(1,115200*2); //adjusted to account for clock difference caused by openwsn clock scheme
     //
     // Put a character to show start of example.  This will display on the
     // terminal.

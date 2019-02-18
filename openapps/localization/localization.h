@@ -29,6 +29,7 @@
 #define GPT_TICKS_PER_SC_TICK 976.5625f
 #define ORIENTATION_SAMPLE_N  10
 #define ORIENTATION_SIZE 8
+#define ORIENTATION_PERIOD_MS 100
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
@@ -65,6 +66,7 @@ typedef struct {
    uint8_t          pulse_detected;     //state variable: have i seen a laser pulse
    uint8_t          orientation_received;   //state variable: have i received an orientation EB
    uint32_t         orientation_pulse_time;
+   opentimers_id_t      orientationTimerId;  ///< periodic timer which triggers transmission
        
 } localization_vars_t;
 

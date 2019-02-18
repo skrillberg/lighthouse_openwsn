@@ -295,7 +295,7 @@ void mimsyDmpBegin(){
         hal.dmp_features = DMP_FEATURE_6X_LP_QUAT
         		| DMP_FEATURE_SEND_RAW_ACCEL  | DMP_FEATURE_GYRO_CAL |DMP_FEATURE_SEND_CAL_GYRO;
     dmp_enable_feature(hal.dmp_features);
-    dmp_set_fifo_rate(200);
+    dmp_set_fifo_rate(100);
     //dmp_enable_6x_lp_quat(1);
     mpu_set_dmp_state(1);
     hal.dmp_on = 1;

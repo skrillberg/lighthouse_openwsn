@@ -87,12 +87,29 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 #define GYRO_FSR			2000 //gyro full scale range in deg/s
 void orientation_sendEB(void);
 void orientation_lookup_task(void);
+void orientation_timer_cb(opentimers_id_t id);
+
+//=========================== private vars ====================================
+#define MAG_CAL_SAMPLES 5
+typedef struct{
+    int16_t x;
+    int16_t y;
+    int16_t z;
+} mag_t;
+
+int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
+uint8_t mag_max_idx[3];
+uint8_t mag_min_idx[3];
+mag_t mag_max[MAG_CAL_SAMPLES];
+mag_t mag_min[MAG_CAL_SAMPLES];
+
 //=========================== public ==========================================
 
 void localization_init(void) {
 
     // clear local variables
     memset(&localization_vars,0,sizeof(localization_vars_t));
+    
     testRan = false;
     count = 0; modular_ptr = 0; pulse_count = 0; wsn_count = 0;
     // initialize edges
@@ -126,11 +143,11 @@ void localization_init(void) {
 
     //mimsy specific imu code
     struct int_param_s placeholder;
-   // mpu_init(&placeholder);
-    mimsyIMUInit();
-    mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO); //turn on sensor
-    mpu_set_accel_fsr(16); //set fsr for accel
-    mpu_set_gyro_fsr(GYRO_FSR); //set fsr for accel
+    mpu_init(&placeholder);
+    //mimsyIMUInit();
+    mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO|INV_XYZ_COMPASS); //turn on sensor
+    //mpu_set_accel_fsr(16); //set fsr for accel
+    //mpu_set_gyro_fsr(GYRO_FSR); //set fsr for accel
     mimsyDmpBegin(); //this will cause a crash if the delay in i2c reads is too long, 1 ms was too long
     //mpu_lp_accel_mode(1);
     //mpu_lp_motion_interrupt(100, 300,20);
@@ -144,7 +161,7 @@ void localization_init(void) {
     uint16_t dur = ieee154e_getSlotDuration();
     uartMimsyInit(); //initial mimsy printf
     //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
-    mimsyPrintf(" hello world\n");
+    //mimsyPrintf(" hello world \n");
 	//}
 	//*********************euler angle conversion*****************************************************************
    //pitch control
@@ -165,14 +182,27 @@ void localization_init(void) {
    //roll control
    urocket_vars.roll_last = urocket_vars.roll.flt;
    urocket_vars.roll.flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
-   //mimsyPrintf("\n Roll: %d. Pitch: %d, Yaw: %d",(int)(roll*100),(int)(pitch*100), (int)(yaw*100));
+   mimsyPrintf("\n Roll: %d. Pitch: %d, Yaw: %d",(int)(roll*100),(int)(pitch*100), (int)(yaw*100));
     */
+
+   for(i = 0 ; i< MAG_CAL_SAMPLES; i++){
+        mag_max[i].x = -32767;
+        mag_max[i].y = -32767;
+        mag_max[i].z = -32767;
+        mag_min[i].x = 32767;
+        mag_min[i].y = 32767;
+        mag_min[i].z = 32767;
+   }
+    for (i=0;i<3;i++){
+        mag_max_idx[i] = 0;
+        mag_min_idx[i] = 0;
+    }
 }
 
 void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
    inv_q_norm4(fquats);
 
-   
+       uint8_t i;
    pitch->flt = asinf( 2*(fquats[0]*fquats[2]-fquats[3]*fquats[1])); //computes sin of pitch
 
    //gyro yaw
@@ -182,7 +212,64 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
    //roll control
 
    roll->flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
-   mimsyPrintf("\n Roll: %d. Pitch: %d, Yaw: %d",(int)(roll->flt*100),(int)(pitch->flt*100), (int)(yaw->flt*100));
+  // mimsyPrintf("Roll: %d. Pitch: %d, Yaw: %d \n",(int)(roll->flt*1000),(int)(pitch->flt*1000), (int)(yaw->flt*1000));
+	// get data
+    short compass[3];
+	if (mpu_get_compass_reg(compass, NULL) != 0) {
+		mimsyPrintf("Failed to read compass data\n");
+	}else{
+        for (i=0;i<3;i++){
+            mag_max_idx[i] = 0;
+            mag_min_idx[i] = 0;
+        }
+        if(compass[0] > mag_max[mag_max_idx[0]].x){
+            mag_max[mag_max_idx[0]].x = compass[0];
+            mag_max_idx[0] = (mag_max_idx[0]+1) % MAG_CAL_SAMPLES;
+        }
+        if(compass[1] > mag_max[mag_max_idx[1]].y){
+            mag_max[mag_max_idx[1]].y = compass[1];
+            mag_max_idx[1] = (mag_max_idx[1]+1) % MAG_CAL_SAMPLES;
+        }
+        if(compass[2] > mag_max[mag_max_idx[2]].z){
+            mag_max[mag_max_idx[2]].z = compass[2];
+            mag_max_idx[2] = (mag_max_idx[2]+1) % MAG_CAL_SAMPLES;
+        }
+        if(compass[0] < mag_min[mag_min_idx[0]].x){
+            mag_min[mag_min_idx[0]].x = compass[0];
+            mag_min_idx[0] = (mag_min_idx[0]+1) % MAG_CAL_SAMPLES;
+        }
+        if(compass[1] < mag_min[mag_min_idx[1]].y){
+            mag_min[mag_min_idx[1]].y = compass[1];
+            mag_min_idx[1] = (mag_min_idx[1]+1) % MAG_CAL_SAMPLES;
+        }
+        if(compass[2] < mag_min[mag_min_idx[2]].z){
+            mag_min[mag_min_idx[2]].z = compass[2];
+            mag_min_idx[2] = (mag_min_idx[2]+1) % MAG_CAL_SAMPLES;
+        }
+    }
+    
+    mag_bias[0] = (mag_max[0].x + mag_min[0].x)/2;
+    mag_bias[1] = (mag_max[0].y + mag_min[0].y)/2;
+    mag_bias[2] = (mag_max[0].z + mag_min[0].z)/2;
+	// convert from hardware units to uT
+	float mag_sens = 0.5859;
+	float mag[3];
+	mag[0] = ((float)compass[0]-mag_bias[0]) * mag_sens;
+	mag[1] = ((float)compass[1]-mag_bias[1]) * mag_sens;
+	mag[2] = ((float)compass[2]-mag_bias[2]) * mag_sens;
+    //mimsyPrintf("Compass Data: %d, %d, %d \n",(int) mag[0],(int)mag[1],(int)mag[2]);
+    //
+
+    /*
+    mimsyPrintf("Compass Maxes z:");
+    for(i=0;i<MAG_CAL_SAMPLES; i++){
+        mimsyPrintf("%d, ",mag_min[i].x);
+    }*/
+    //mimsyPrintf("Compass Bias: %d, %d, %d",mag_bias[0], mag_bias[1], mag_bias[2]);
+    //mimsyPrintf("Compass Data: %d, %d, %d",(int) compass[0],(int)compass[1],(int)compass[2]);
+    //mimsyPrintf("\n");
+    mimsyPrintf("Compass Data: %d, %d, %d \n",(int) mag[0],(int)mag[1],(int)mag[2]);
+   
 }
 
 void open_timer_init(void){
@@ -197,7 +284,18 @@ void open_timer_init(void){
         localization_timer_cb
     );
 
-    localization_vars.offsetTimerId = opentimers_create();
+    localization_vars.orientationTimerId = opentimers_create();
+
+    opentimers_scheduleIn(
+        localization_vars.orientationTimerId,
+        ORIENTATION_PERIOD_MS,
+        TIME_MS,
+        TIMER_PERIODIC,
+        orientation_timer_cb
+    );
+
+
+    
 
 }
 
@@ -330,9 +428,11 @@ void mimsy_GPIO_falling_edge_handler(void) {
                     + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
                     + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
                     + sixtop_vars.sync_pulse_timer_offset; 
-
-        localization_vars.orientation_pulse_time = curr_time;
-        localization_vars.pulse_detected = 1;
+        if(localization_vars.orientation_received == 0){
+            localization_vars.orientation_pulse_time = curr_time;
+            localization_vars.pulse_detected = 1;
+            mimsyPrintf("Pulse Detected \n");
+        }
 
     //only counts horizontal sync bits
     if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US) && ((sync_bits(period) & 0b001) + 1 == 1)){
@@ -508,10 +608,15 @@ void localization_timer_cb(opentimers_id_t id){
     */
     scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
 }
+void orientation_timer_cb(opentimers_id_t id){
+    scheduler_push_task(orientation_lookup_task,TASKPRIO_COAP);
+}
 void orientation_lookup_task(void){
+
     if(localization_vars.pulse_detected && localization_vars.orientation_received){
         uint8_t idx;
         uint8_t found;
+        mimsyPrintf("Calculation State \n");
         found = 0;
         for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
             //search for the nearest time in the table
@@ -523,18 +628,24 @@ void orientation_lookup_task(void){
                     int32_t orientation =   localization_vars.orientations_tmp[idx].fields.orientation + 
                                             interp_slope*(localization_vars.orientation_pulse_time - localization_vars.orientations_tmp[idx].fields.time) ;
                     found = 1;
+                    mimsyPrintf("Orientation: %d \n", orientation);
                     break;
                 }
             }
-        found = 0;
+        }
         localization_vars.pulse_detected = 0;
         localization_vars.orientation_received = 0;
-        }
+        mimsyPrintf("Calculation State Exited; Found: %d \n",found);
+        found = 0;
+    }
+    else if(!localization_vars.pulse_detected && localization_vars.orientation_received){
+    	localization_vars.orientation_received = 0; //clear flag since we got an orientation before we got a laser pulse
+    	mimsyPrintf("Orientation Without Corresponding Pulse \n");
     }
 
 }
 void localization_task_cb(void) {
-    orientation_lookup_task();
+    //orientation_lookup_task();
     scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
 
 	float fquats[4] = {0,0,0,0};
@@ -558,7 +669,7 @@ void localization_task_cb(void) {
 
 
     //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
-    mimsyPrintf(" dmp fifo error\n");
+    //mimsyPrintf(" dmp fifo error\n");
 	//}
     //convert quats from hardware units to float
     fquats[0]=(float)quat[0]/(float)0x40000000;
@@ -586,7 +697,7 @@ void localization_task_cb(void) {
     IMUData data;
     mimsyIMURead6Dof(&data);
 
-    mimsyPrintf("dmp data: ");
+    //mimsyPrintf("dmp data: ");
     /*
     openserial_printError(
      COMPONENT_localization,
