@@ -102,6 +102,7 @@ uint8_t mag_max_idx[3];
 uint8_t mag_min_idx[3];
 mag_t mag_max[MAG_CAL_SAMPLES];
 mag_t mag_min[MAG_CAL_SAMPLES];
+float heading; //heading in radians
 
 //=========================== public ==========================================
 
@@ -257,6 +258,7 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
 	mag[0] = ((float)compass[0]-mag_bias[0]) * mag_sens;
 	mag[1] = ((float)compass[1]-mag_bias[1]) * mag_sens;
 	mag[2] = ((float)compass[2]-mag_bias[2]) * mag_sens;
+    heading = atan2f(mag[0],mag[1]);
     //mimsyPrintf("Compass Data: %d, %d, %d \n",(int) mag[0],(int)mag[1],(int)mag[2]);
     //
 
@@ -268,7 +270,7 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
     //mimsyPrintf("Compass Bias: %d, %d, %d",mag_bias[0], mag_bias[1], mag_bias[2]);
     //mimsyPrintf("Compass Data: %d, %d, %d",(int) compass[0],(int)compass[1],(int)compass[2]);
     //mimsyPrintf("\n");
-    mimsyPrintf("Compass Data: %d, %d, %d \n",(int) mag[0],(int)mag[1],(int)mag[2]);
+    //mimsyPrintf("Compass Data: %d, %d, %d, %d \n",(int) compass[0],(int)compass[1],(int)compass[2], (int)(heading*1000));
    
 }
 
@@ -683,7 +685,7 @@ void localization_task_cb(void) {
     calc_eulers(fquats, &roll, &pitch , &yaw);
     
     //save orientations and timestamps 
-    localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(yaw.flt*1000); //in milliradians
+    localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(heading*1000); //in milliradians
     localization_vars.orientations[localization_vars.orientation_idx].fields.time = curr_time; //save time
     localization_vars.orientation_idx++;
 
