@@ -13,7 +13,7 @@
 
 //=========================== define ==========================================
 
-#define LOCALIZATION_PERIOD_MS 200
+#define LOCALIZATION_PERIOD_MS 100
 #define PULSE_TRACK_COUNT 5
 
 #define MIN_SYNC_PERIOD_US 52
