@@ -92,6 +92,7 @@ void compass_cal_lookup(void);
 
 //=========================== private vars ====================================
 #define MAG_CAL_SAMPLES 5
+#define PRINT 1
 typedef struct{
     int16_t x;
     int16_t y;
@@ -238,7 +239,7 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
   // mimsyPrintf("Roll: %d. Pitch: %d, Yaw: %d \n",(int)(roll->flt*1000),(int)(pitch->flt*1000), (int)(yaw->flt*1000));
 	// get data
     short compass[3];
-	if (mpu_get_compass_reg(compass, NULL) != 0) {
+	if (mpu_get_compass_reg(compass, NULL) != 0 && PRINT) {
 		mimsyPrintf("Failed to read compass data\n");
 	}else{
         for (i=0;i<3;i++){
@@ -291,10 +292,10 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
     }*/
     open_addr_t * addr = idmanager_getMyID(ADDR_16B);
     
-    mimsyPrintf("Mote %d, Compass Bias: %d, %d, %d; ",addr->addr_16b[1],mag_bias[0], mag_bias[1], mag_bias[2]);
+    //mimsyPrintf("Mote %d, Compass Bias: %d, %d, %d; ",addr->addr_16b[1],mag_bias[0], mag_bias[1], mag_bias[2]);
     //mimsyPrintf("Compass Data: %d, %d, %d",(int) compass[0],(int)compass[1],(int)compass[2]);
     //mimsyPrintf("\n");
-    mimsyPrintf("Compass Data: %d, %d, %d, Heading: %d \n",(int) compass[0],(int)compass[1],(int)compass[2], (int)(heading*1000));
+   // mimsyPrintf("Compass Data: %d, %d, %d, Heading: %d \n",(int) compass[0],(int)compass[1],(int)compass[2], (int)(heading*1000));
    
 }
 
@@ -457,7 +458,9 @@ void mimsy_GPIO_falling_edge_handler(void) {
         if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0){
             localization_vars.orientation_pulse_time = curr_time;
             localization_vars.pulse_detected = 1;
-            mimsyPrintf("Pulse Detected \n");
+            if(PRINT){
+            	//mimsyPrintf("Pulse Detected \n");
+            }
         }
 
     //only counts horizontal sync bits
@@ -642,7 +645,9 @@ void orientation_lookup_task(void){
     if(localization_vars.pulse_detected && localization_vars.orientation_received){
         uint8_t idx;
         uint8_t found;
-        mimsyPrintf("Calculation State \n");
+        if(PRINT){
+        	//mimsyPrintf("Calculation State \n");
+        }
         found = 0;
         for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
             //search for the nearest time in the table
@@ -662,20 +667,27 @@ void orientation_lookup_task(void){
                     float interp_slope = ((float)orientation_diff)/(1+time_diff);
                     int32_t orientation =   localization_vars.orientations_tmp[idx].fields.orientation + 
                                             interp_slope*(localization_vars.orientation_pulse_time - localization_vars.orientations_tmp[idx].fields.time) ;
+                    //orientation =  localization_vars.orientations_tmp[idx].fields.orientation;
                     found = 1;
-                    mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
+                    if(PRINT){
+                    	mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
+                    }
                     break;
                 }
             }
         }
         localization_vars.pulse_detected = 0;
         localization_vars.orientation_received = 0;
-        mimsyPrintf("Calculation State Exited; Found: %d \n",found);
+        if(PRINT){
+        	//mimsyPrintf("Calculation State Exited; Found: %d \n",found);
+        }
         found = 0;
     }
     else if(!localization_vars.pulse_detected && localization_vars.orientation_received){
     	localization_vars.orientation_received = 0; //clear flag since we got an orientation before we got a laser pulse
-    	mimsyPrintf("Orientation Without Corresponding Pulse \n");
+    	if(PRINT){
+    		//mimsyPrintf("Orientation no Pulse \n");
+    	}
     }
 
 }
