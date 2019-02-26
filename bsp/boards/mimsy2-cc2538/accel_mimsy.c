@@ -291,12 +291,12 @@ void mimsyDmpBegin(){
        alt_inv_orientation_matrix_to_scalar(gyro_pdata.orientation));
           dmp_register_tap_cb(tap_cb);
     dmp_register_android_orient_cb(android_orient_cb);
-    
+        mpu_configure_fifo(INV_XYZ_ACCEL | INV_XYZ_GYRO);
         hal.dmp_features = DMP_FEATURE_6X_LP_QUAT
         		| DMP_FEATURE_SEND_RAW_ACCEL  | DMP_FEATURE_GYRO_CAL |DMP_FEATURE_SEND_CAL_GYRO;
     dmp_enable_feature(hal.dmp_features);
     dmp_set_fifo_rate(100);
-    //dmp_enable_6x_lp_quat(1);
+    mpu_configure_fifo(INV_XYZ_ACCEL | INV_XYZ_GYRO);
     mpu_set_dmp_state(1);
     hal.dmp_on = 1;
 }

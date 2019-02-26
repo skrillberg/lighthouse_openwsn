@@ -146,12 +146,14 @@ void localization_init(void) {
 
     //mimsy specific imu code
     struct int_param_s placeholder;
-    mpu_init(&placeholder);
-    //mimsyIMUInit();
-    mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO|INV_XYZ_COMPASS|INV_WXYZ_QUAT); //turn on sensor
-    //mpu_set_accel_fsr(16); //set fsr for accel
-    //mpu_set_gyro_fsr(GYRO_FSR); //set fsr for accel
+    //mpu_init(&placeholder);
+    mimsyIMUInit();
+    mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO|INV_XYZ_COMPASS); //turn on sensor
+    mpu_configure_fifo(INV_XYZ_ACCEL | INV_XYZ_GYRO);
+    mpu_set_accel_fsr(8); //set fsr for accel
+    mpu_set_gyro_fsr(2000); //set fsr for accel
     mimsyDmpBegin(); //this will cause a crash if the delay in i2c reads is too long, 1 ms was too long
+
     //mpu_lp_accel_mode(1);
     //mpu_lp_motion_interrupt(100, 300,20);
 	float fquats[4] = {0,0,0,0};
@@ -236,9 +238,10 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
    //roll control
 
    roll->flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
-  // mimsyPrintf("Roll: %d. Pitch: %d, Yaw: %d \n",(int)(roll->flt*1000),(int)(pitch->flt*1000), (int)(yaw->flt*1000));
+   mimsyPrintf("Roll: %d. Pitch: %d, Yaw: %d \n",(int)(roll->flt*1000),(int)(pitch->flt*1000), (int)(yaw->flt*1000));
 	// get data
     short compass[3];
+    /*
 	if (mpu_get_compass_reg(compass, NULL) != 0 && PRINT) {
 		mimsyPrintf("Failed to read compass data\n");
 	}else{
@@ -270,7 +273,7 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
             mag_min[mag_min_idx[2]].z = compass[2];
             mag_min_idx[2] = (mag_min_idx[2]+1) % MAG_CAL_SAMPLES;
         }
-    }
+    }*/
     
     mag_bias[0] = (mag_max[0].x + mag_min[0].x)/2;
     mag_bias[1] = (mag_max[0].y + mag_min[0].y)/2;
@@ -702,8 +705,8 @@ void localization_task_cb(void) {
     short sensors;
     unsigned char more;
     unsigned long timestamp;
-    dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more);
-
+    int code = dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more);
+    mpu_get_fifo_config(&sensors);
     uint8_t asn[5];
     ieee154e_getAsn(asn);      
     uint32_t asn_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
@@ -727,8 +730,9 @@ void localization_task_cb(void) {
     euler_t roll;
     euler_t pitch;
     euler_t yaw;
-    calc_eulers(fquats, &roll, &pitch , &yaw);
-    
+    if(code == 0){
+    	calc_eulers(fquats, &roll, &pitch , &yaw);
+    }
     //save orientations and timestamps 
     localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(heading*1000); //in milliradians
     localization_vars.orientations[localization_vars.orientation_idx].fields.time = curr_time; //save time

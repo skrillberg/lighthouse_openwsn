@@ -116,7 +116,7 @@ int i2c_read_registers(uint8_t slave_addr,
            i2c_write_byte(slave_addr,reg_addr);
            //i2c_read_byte(slave_addr,spaceToWrite);
            i2c_read_bytes(slave_addr,spaceToWrite,numBytes);
-           delay_ms(1);
+           delay_ms(2);
            return 0;
 }
 
