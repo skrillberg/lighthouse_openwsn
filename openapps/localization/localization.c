@@ -579,7 +579,7 @@ void orientation_lookup_task(void){
                     if(PRINT){
                     	mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
                     }
-                    break;
+
                 }
             }
         }
