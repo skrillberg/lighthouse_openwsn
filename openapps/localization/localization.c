@@ -142,17 +142,18 @@ void localization_init(void) {
     // configure_pins();
     precision_timers_init();
     open_timer_init();
-    motor_init(0,1,25,GPIO_D_BASE,GPIO_PIN_1);
+    //motor_init(0,1,25,GPIO_D_BASE,GPIO_PIN_1);
 
     //mimsy specific imu code
     struct int_param_s placeholder;
-    //mpu_init(&placeholder);
-    mimsyIMUInit();
+    mpu_init(&placeholder);
+    //mimsyIMUInit();
     mpu_set_sensors(INV_XYZ_ACCEL|INV_XYZ_GYRO|INV_XYZ_COMPASS); //turn on sensor
-    mpu_configure_fifo(INV_XYZ_ACCEL | INV_XYZ_GYRO);
+    mpu_set_compass_sample_rate(50);
+    //mpu_configure_fifo(INV_XYZ_ACCEL | INV_XYZ_GYRO);
     mpu_set_accel_fsr(8); //set fsr for accel
     mpu_set_gyro_fsr(2000); //set fsr for accel
-    mimsyDmpBegin(); //this will cause a crash if the delay in i2c reads is too long, 1 ms was too long
+    //mimsyDmpBegin(); //this will cause a crash if the delay in i2c reads is too long, 1 ms was too long
 
     //mpu_lp_accel_mode(1);
     //mpu_lp_motion_interrupt(100, 300,20);
@@ -215,10 +216,22 @@ void compass_cal_lookup(void){
             hard_mag_bias[0] = -41;
             hard_mag_bias[1] = 236;
             hard_mag_bias[2] = -507;
+
+            if(LEGO_DRONE_MOUNT){
+                //hard_mag_bias[0] = 460;
+                //hard_mag_bias[1] = -83;
+                //hard_mag_bias[2] = -1025;
+                hard_mag_bias[0] = 455;
+                hard_mag_bias[1] = -40;
+                hard_mag_bias[2] = -1025;
+            }
+
+            break;
         case(58):
             hard_mag_bias[0] = -23;
             hard_mag_bias[1] = -156;
             hard_mag_bias[2] = -111;
+            break;
             
 
         
@@ -238,10 +251,10 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
    //roll control
 
    roll->flt=  atan2f(2 * (fquats[0]*fquats[1] + fquats[2] * fquats[3]) ,(1 -2*(fquats[1] * fquats[1] +fquats[2]*fquats[2])));
-   mimsyPrintf("Roll: %d. Pitch: %d, Yaw: %d \n",(int)(roll->flt*1000),(int)(pitch->flt*1000), (int)(yaw->flt*1000));
+   //mimsyPrintf("Roll: %d. Pitch: %d, Yaw: %d \n",(int)(roll->flt*1000),(int)(pitch->flt*1000), (int)(yaw->flt*1000));
 	// get data
     short compass[3];
-    /*
+    
 	if (mpu_get_compass_reg(compass, NULL) != 0 && PRINT) {
 		mimsyPrintf("Failed to read compass data\n");
 	}else{
@@ -273,7 +286,7 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
             mag_min[mag_min_idx[2]].z = compass[2];
             mag_min_idx[2] = (mag_min_idx[2]+1) % MAG_CAL_SAMPLES;
         }
-    }*/
+    }
     
     mag_bias[0] = (mag_max[0].x + mag_min[0].x)/2;
     mag_bias[1] = (mag_max[0].y + mag_min[0].y)/2;
@@ -285,6 +298,9 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
 	mag[1] = ((float)compass[1]-hard_mag_bias[1]) * mag_sens;
 	mag[2] = ((float)compass[2]-hard_mag_bias[2]) * mag_sens;
     heading = atan2f(mag[0],mag[1]);
+    if(heading < 0){
+     heading = (2*PI + heading);
+    }
     //mimsyPrintf("Compass Data: %d, %d, %d \n",(int) mag[0],(int)mag[1],(int)mag[2]);
     //
 
@@ -298,7 +314,7 @@ void calc_eulers(float * fquats, euler_t* roll, euler_t * pitch, euler_t* yaw){
     //mimsyPrintf("Mote %d, Compass Bias: %d, %d, %d; ",addr->addr_16b[1],mag_bias[0], mag_bias[1], mag_bias[2]);
     //mimsyPrintf("Compass Data: %d, %d, %d",(int) compass[0],(int)compass[1],(int)compass[2]);
     //mimsyPrintf("\n");
-   // mimsyPrintf("Compass Data: %d, %d, %d, Heading: %d \n",(int) compass[0],(int)compass[1],(int)compass[2], (int)(heading*1000));
+    //mimsyPrintf("Compass Data: %d, %d, %d, Heading: %d \n",(int) compass[0],(int)compass[1],(int)compass[2], (int)(heading*1000));
    
 }
 
@@ -332,9 +348,9 @@ void open_timer_init(void){
 void precision_timers_init(void){
    // SysCtrlPeripheralEnable(SYS_CTRL_PERIPH_GPT2); // enables timer1 module
     SysCtrlPeripheralEnable(SYS_CTRL_PERIPH_GPT3); // enables timer3 module
-    
-    input_edge_timers_init();
-
+    if(LIGHTHOUSE_MOTE == 0){
+        input_edge_timers_init();
+    }
     // TimerConfigure(gptmPeriodTimerBase, GPTIMER_CFG_PERIODIC_UP);
     // TimerLoadSet(gptmPeriodTimerBase,GPTIMER_A,timer_cnt_32);
     // TimerEnable(gptmPeriodTimerBase,GPTIMER_A);
@@ -465,132 +481,8 @@ void mimsy_GPIO_falling_edge_handler(void) {
             	//mimsyPrintf("Pulse Detected \n");
             }
         }
-
-    //only counts horizontal sync bits
-    if((period < MAX_SYNC_PERIOD_US) && (period > MIN_SYNC_PERIOD_US) && ((sync_bits(period) & 0b001) + 1 == 1)){
-        
-        ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
-
-        //sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
-        /*  
-        if(pulses[modular_ptr].rise > localization_vars.start_of_slot){
-            sixtop_vars.sync_pulse_timer_offset = (pulses[modular_ptr].rise - localization_vars.start_of_slot)/977;
-        }else{
-            sixtop_vars.sync_pulse_timer_offset = ((timer_cnt_24 - localization_vars.start_of_slot) + pulses[modular_ptr].rise)/977;
-            
-        }*/
-        /*
-        openserial_printError(
-             COMPONENT_localization,
-             ERR_NO_FREE_PACKET_BUFFER,
-             (errorparameter_t)(uint16_t)11111,
-             (errorparameter_t)0
-          );*/
-
-
-        /*
-        openserial_printError(
-             COMPONENT_localization,
-             ERR_NO_FREE_PACKET_BUFFER,
-             (errorparameter_t)(uint16_t)(pulses[modular_ptr].rise/32000),
-             (errorparameter_t)0
-          );*/
-
-
-
-        //update the projected sync time
-        //sixtop_vars.ref_sync_pulse += (uint32_t)(sixtop_vars.sync_pulse_period*100);    //multiplied by 100 to provide more sig figs
-        
-        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
-        /*openserial_printError(
-             COMPONENT_localization,
-             ERR_NO_FREE_PACKET_BUFFER,
-             (errorparameter_t)(uint16_t)(TimerValueGet(GPTIMER2_BASE, GPTIMER_A)/32000),
-             (errorparameter_t)0
-          );*/
-
-        uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
-                    + sixtop_vars.sync_pulse_timer_offset; 
-
-        sixtop_vars.current_sync_pulse_time = curr_time;
-        asn_pulses[modular_ptr].fall = curr_time;
-        asn_pulses[modular_ptr].rise = (uint32_t)((float)curr_time - (period*32/976.5625)); //curr_time is in 32.768 khz tick units
-
-
-           /*
-          openserial_printError(
-             COMPONENT_localization,
-             ERR_NO_FREE_PACKET_BUFFER,
-             (errorparameter_t)diff,
-             (errorparameter_t)0
-         
-          );*/
-
-        uint32_t raw_diff;
-
-
-        raw_diff = curr_time - localization_vars.last_sync_time;
-        localization_vars.last_sync_time = curr_time; 
-
-        //filters out bad pulse timings, need to figure out why this is a problem
-        if(raw_diff < 600 && raw_diff>400){
-
-            //selectively upadate saved time every x number of pulses
-            if(localization_vars.sync_count % LIGHTHOUSE_KA_PERIODS == 0){
-
-
-                sixtop_vars.ref_sync_pulse = curr_time*100; //multiplied by 100 to provide more sig figs
-
-            }
-
-
-
-            if(localization_vars.sync_count > 30){
-                sixtop_vars.sync_pulse_period = (float)sixtop_vars.sync_pulse_period/(float)(localization_vars.sync_count + 1 )*(float)(localization_vars.sync_count)
-		            +(float)(raw_diff)/(float)(localization_vars.sync_count + 1);
-                localization_vars.sync_count += 1;
-                /*
-	            openserial_printError(
-                     COMPONENT_localization,
-                     ERR_NO_FREE_PACKET_BUFFER,
-                     (errorparameter_t)(uint16_t)(sixtop_vars.sync_pulse_period * 100),
-                     (errorparameter_t)0
-                  );*/ 
-                /*
-	            openserial_printError(
-                     COMPONENT_localization,
-                     ERR_NO_FREE_PACKET_BUFFER,
-                     (errorparameter_t)(uint16_t)((float)(curr_time-last_time)/(float)(localization_vars.sync_count + 1)*100),
-                     (errorparameter_t)0
-                  );*/ 
-                 sixtop_vars.sync_pulse_period = LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD;
-            }else{
-	            sixtop_vars.sync_pulse_period = LIGHTHOUSE_HORIZONTAL_SYNC_PERIOD;
-                localization_vars.sync_count += 1;
-	        } 
-        
-        } 
-    }else{
-        ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
-        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
-        uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
-                    + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
-                    + sixtop_vars.sync_pulse_timer_offset; 
-
-        sixtop_vars.current_sync_pulse_time = curr_time;
-        asn_pulses[modular_ptr].fall = curr_time;
-        asn_pulses[modular_ptr].rise = (uint32_t)((float)curr_time - (period*32/967.5625)); //curr_time is in 32.768 khz tick units
-    }
-
-    modular_ptr++; if (modular_ptr == 5) modular_ptr = 0;
-    pulse_count += 1;
-
 }
+
 void localization_offset_timer_cb(opentimers_id_t id){
 
     scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
@@ -637,8 +529,9 @@ void localization_timer_cb(opentimers_id_t id){
     scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
     // SCHEDULER_WAKEUP();
     }
-    */
-    scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
+    */if(LIGHTHOUSE_MOTE == 1){
+        scheduler_push_task(localization_task_cb,TASKPRIO_COAP);
+    }
 }
 void orientation_timer_cb(opentimers_id_t id){
     scheduler_push_task(orientation_lookup_task,TASKPRIO_COAP);
@@ -653,23 +546,34 @@ void orientation_lookup_task(void){
         }
         found = 0;
         for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
+        	if(LIGHTHOUSE_MOTE == 0){
+        		mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[idx].fields.time,
+                                                localization_vars.orientations_tmp[idx].fields.orientation);
+        	}
             //search for the nearest time in the table
             if(localization_vars.orientation_pulse_time > localization_vars.orientations_tmp[idx].fields.time && localization_vars.orientation_pulse_time < localization_vars.orientations_tmp[idx+1].fields.time){
                 if(idx < ORIENTATION_SAMPLE_N -1){
-                	int32_t orientation_diff = localization_vars.orientations_tmp[idx+1].fields.orientation -  localization_vars.orientations_tmp[idx].fields.orientation;
+                	int next = localization_vars.orientations_tmp[idx+1].fields.orientation;
+                	int prev = localization_vars.orientations_tmp[idx].fields.orientation;
+                	int32_t orientation_diff = next - prev;
                     //calc angle wrap if angle diff magnitude>PI and orientations are different signs
-                    if(localization_vars.orientations_tmp[idx+1].fields.orientation * localization_vars.orientations_tmp[idx].fields.orientation<0){
-                        if(orientation_diff > 3.14159){
-                            orientation_diff = 2*PI - orientation_diff;
-                        }
-                        else if(orientation_diff < -PI){
-                            orientation_diff = -2*PI - orientation_diff;   
-                        }
+                    if(orientation_diff > PI){
+
+                    	orientation_diff =  orientation_diff - 2*PI;
                     }
+					else if(orientation_diff < -PI){
+						orientation_diff = 2*PI + orientation_diff;
+					}
+
                 	uint32_t time_diff = (localization_vars.orientations_tmp[idx+1].fields.time -  localization_vars.orientations_tmp[idx].fields.time +1);
                     float interp_slope = ((float)orientation_diff)/(1+time_diff);
                     int32_t orientation =   localization_vars.orientations_tmp[idx].fields.orientation + 
                                             interp_slope*(localization_vars.orientation_pulse_time - localization_vars.orientations_tmp[idx].fields.time) ;
+                    if(orientation > 6283){
+                    	orientation = (orientation-6283);
+                    }else if(orientation < 0){
+                    	orientation = 6283 + orientation;
+                    }
                     //orientation =  localization_vars.orientations_tmp[idx].fields.orientation;
                     found = 1;
                     if(PRINT){
@@ -678,6 +582,10 @@ void orientation_lookup_task(void){
                     break;
                 }
             }
+        }
+        if(LIGHTHOUSE_MOTE == 0){
+        mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.time,
+                                            localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.orientation);
         }
         localization_vars.pulse_detected = 0;
         localization_vars.orientation_received = 0;
@@ -690,6 +598,11 @@ void orientation_lookup_task(void){
     	localization_vars.orientation_received = 0; //clear flag since we got an orientation before we got a laser pulse
     	if(PRINT){
     		//mimsyPrintf("Orientation no Pulse \n");
+            int edx;
+            for(edx = 0; edx < ORIENTATION_SAMPLE_N; edx++ ){
+                mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[edx].fields.time,
+                                                    localization_vars.orientations_tmp[edx].fields.orientation);
+            }
     	}
     }
 
@@ -705,8 +618,8 @@ void localization_task_cb(void) {
     short sensors;
     unsigned char more;
     unsigned long timestamp;
-    int code = dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more);
-    mpu_get_fifo_config(&sensors);
+   // int code = dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more);
+   // mpu_get_fifo_config(&sensors);
     uint8_t asn[5];
     ieee154e_getAsn(asn);      
     uint32_t asn_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
@@ -730,15 +643,16 @@ void localization_task_cb(void) {
     euler_t roll;
     euler_t pitch;
     euler_t yaw;
-    if(code == 0){
-    	calc_eulers(fquats, &roll, &pitch , &yaw);
-    }
-    //save orientations and timestamps 
+    //if(code == 0 && sensors != 0){
+    	
+        //save orientations and timestamps
+
+    //}
+    calc_eulers(fquats, &roll, &pitch , &yaw);
     localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(heading*1000); //in milliradians
     localization_vars.orientations[localization_vars.orientation_idx].fields.time = curr_time; //save time
     localization_vars.orientation_idx++;
-
-    if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N){
+    if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N && LIGHTHOUSE_MOTE == 1){
        localization_vars.orientation_idx = 0;
         orientation_sendEB();
     }
@@ -746,7 +660,7 @@ void localization_task_cb(void) {
  
 
     IMUData data;
-    mimsyIMURead6Dof(&data);
+    //mimsyIMURead6Dof(&data);
 
     //mimsyPrintf("dmp data: ");
     /*

@@ -13,7 +13,7 @@
 
 //=========================== define ==========================================
 
-#define LOCALIZATION_PERIOD_MS 100
+#define LOCALIZATION_PERIOD_MS 50
 #define PULSE_TRACK_COUNT 5
 
 #define MIN_SYNC_PERIOD_US 52
@@ -30,6 +30,8 @@
 #define ORIENTATION_SAMPLE_N  10
 #define ORIENTATION_SIZE 8
 #define ORIENTATION_PERIOD_MS 100
+#define LIGHTHOUSE_MOTE 0
+#define LEGO_DRONE_MOUNT 0
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
