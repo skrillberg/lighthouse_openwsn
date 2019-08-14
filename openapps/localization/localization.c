@@ -92,7 +92,8 @@ void compass_cal_lookup(void);
 
 //=========================== private vars ====================================
 #define MAG_CAL_SAMPLES 5
-#define PRINT 1
+#define PRINT 0
+#define CRAZYFLIE 1
 typedef struct{
     int16_t x;
     int16_t y;
@@ -546,7 +547,7 @@ void orientation_lookup_task(void){
         }
         found = 0;
         for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
-        	if(LIGHTHOUSE_MOTE == 0){
+        	if(LIGHTHOUSE_MOTE == 0 && PRINT){
         		mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[idx].fields.time,
                                                 localization_vars.orientations_tmp[idx].fields.orientation);
         	}
@@ -569,6 +570,10 @@ void orientation_lookup_task(void){
                     float interp_slope = ((float)orientation_diff)/(1+time_diff);
                     int32_t orientation =   localization_vars.orientations_tmp[idx].fields.orientation + 
                                             interp_slope*(localization_vars.orientation_pulse_time - localization_vars.orientations_tmp[idx].fields.time) ;
+                    char crazypacket[15];
+                    uint8_t synch_packet[4]  = {0xde,0xad,0xbe,0xef};
+                    int i_print = 0;
+
                     if(orientation > 6283){
                     	orientation = (orientation-6283);
                     }else if(orientation < 0){
@@ -579,11 +584,47 @@ void orientation_lookup_task(void){
                     if(PRINT){
                     	mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
                     }
+                    if (CRAZYFLIE){
+                        //create crazyflie lh packet
+                        crazypacket[0] = 100; //preamble for lh packet type
+
+                        //random number, i'll put length for now
+                        crazypacket[1] = 'a';
+                        //x location
+                        crazypacket[2] = sixtop_vars.location.x & 0xff00 >> 8;
+                        crazypacket[3] = sixtop_vars.location.x & 0x00ff;
+
+                        //y location
+                        crazypacket[4] = sixtop_vars.location.y & 0xff00 >> 8;
+                        crazypacket[5] = sixtop_vars.location.y & 0x00ff;
+
+                        //orientation: milliradians in int32
+                        crazypacket[6] = orientation & 0xFF000000 >> 24;
+                        crazypacket[7] = orientation & 0x00FF0000 >> 16;
+                        crazypacket[8] = orientation & 0x0000FF00 >> 8;
+                        crazypacket[9] = orientation & 0xFF;
+                        
+                        //time of pulse in openwsn asn time
+                        crazypacket[10] = localization_vars.orientation_pulse_time & 0xFF000000 >> 24;
+                        crazypacket[11] = localization_vars.orientation_pulse_time & 0xFF0000 >> 16;
+                        crazypacket[12] = localization_vars.orientation_pulse_time & 0xFF00 >> 8;
+                        crazypacket[13] = localization_vars.orientation_pulse_time & 0xFF;
+
+                        //end of frame byte
+                        crazypacket[14] = 122;
+
+                        
+                        mimsyPrintf(crazypacket);
+                        
+                       //print orientation and location in crazyflie lighthouse measurement format
+                          
+                      	//mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);                      
+                    }
 
                 }
             }
         }
-        if(LIGHTHOUSE_MOTE == 0){
+        if(LIGHTHOUSE_MOTE == 0 && PRINT){
         mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.time,
                                             localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.orientation);
         }
