@@ -13,6 +13,15 @@
 #define EXAMPLE_PIN_UART_TXD            GPIO_PIN_2
 #define EXAMPLE_GPIO_BASE               GPIO_D_BASE
 
+uint8_t uart_mimsy_readByte(void){
+	 int32_t i32Char;
+     if(UARTCharsAvail(UART1_BASE)){
+        i32Char = UARTCharGet(UART1_BASE);
+	    return (uint8_t)(i32Char & 0xFF);
+     }else{
+        return 0;
+     }
+}
 
 void uartMimsyInit(){
   
@@ -69,6 +78,7 @@ void uartMimsyInit(){
     // Put a character to show start of example.  This will display on the
     // terminal.
     //  
+    UARTFIFOEnable(UART1_BASE);
     UARTEnable(UART1_BASE);
 
 }

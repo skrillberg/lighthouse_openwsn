@@ -538,7 +538,13 @@ void orientation_timer_cb(opentimers_id_t id){
     scheduler_push_task(orientation_lookup_task,TASKPRIO_COAP);
 }
 void orientation_lookup_task(void){
-
+    //look for uart packets
+    char byte = 0;
+    byte = uart_mimsy_readByte();
+    while(byte){
+        mimsyPrintf("%c \n",byte);
+        byte = uart_mimsy_readByte();
+    }
     if(localization_vars.pulse_detected && localization_vars.orientation_received){
         uint8_t idx;
         uint8_t found;
