@@ -89,6 +89,7 @@ void orientation_sendEB(void);
 void orientation_lookup_task(void);
 void orientation_timer_cb(opentimers_id_t id);
 void compass_cal_lookup(void);
+void receive_cf_packet(void);
 
 //=========================== private vars ====================================
 #define MAG_CAL_SAMPLES 5
@@ -539,12 +540,8 @@ void orientation_timer_cb(opentimers_id_t id){
 }
 void orientation_lookup_task(void){
     //look for uart packets
-    char byte = 0;
-    byte = uart_mimsy_readByte();
-    while(byte){
-        mimsyPrintf("%c \n",byte);
-        byte = uart_mimsy_readByte();
-    }
+    receive_cf_packet();
+
     if(localization_vars.pulse_detected && localization_vars.orientation_received){
         uint8_t idx;
         uint8_t found;
@@ -899,6 +896,65 @@ void localization_task_cb(void) {
       count += 1;
    }
     */
+}
+
+void receive_cf_packet(void){
+
+    union{
+        int16_t val;
+        uint8_t bytes[2];
+    } x;
+
+    union{
+        int16_t val;
+        uint8_t bytes[2];
+    } y;
+
+    union{
+        int32_t val;
+        uint8_t bytes[4];
+    } phi;
+   
+    uint8_t packet[10];
+    uint8_t byte = 0;
+    byte = uart_mimsy_readByte();
+    
+    //check for correct start flag from crazyflie
+    if(byte != 's'){
+        return;
+    }
+
+    //receive the 10 uart bytes from packet
+    packet[0] = byte;
+    uint8_t count = 1;
+    while(byte && count <10){
+        mimsyPrintf("%c",byte);
+        byte = uart_mimsy_readByte();
+        packet[1] = byte;
+        count++;
+    }
+    mimsyPrintf("%c \n",byte);
+    
+    //check for correct end flag from crazyflie
+    if(byte!= 'z'){
+        return;
+    }else{
+        //convert byte to location and heading
+        x.bytes[0] = packet[1];
+        x.bytes[1] = packet[2];
+
+        y.bytes[0] = packet[3];
+        y.bytes[1] = packet[4];
+
+        phi.bytes[0] = packet[5];
+        phi.bytes[1] = packet[6];
+        phi.bytes[2] = packet[7];
+        phi.bytes[3] = packet[8];
+
+        //update locations with crazyflie state
+        mimsyPrintf("Valid State Packet! x: %d, y: %d, phi: %d \n",x.val,y.val,phi.val);
+    } 
+
 }
 
 float get_period_us_32(uint32_t start, uint32_t end) {
