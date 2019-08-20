@@ -30,7 +30,7 @@
 #define ORIENTATION_SAMPLE_N  10
 #define ORIENTATION_SIZE 8
 #define ORIENTATION_PERIOD_MS 100
-#define LIGHTHOUSE_MOTE 0
+#define LIGHTHOUSE_MOTE 1
 #define LEGO_DRONE_MOUNT 0
 //=========================== typedef =========================================
 
@@ -68,7 +68,14 @@ typedef struct {
    uint8_t          pulse_detected;     //state variable: have i seen a laser pulse
    uint8_t          orientation_received;   //state variable: have i received an orientation EB
    uint32_t         orientation_pulse_time;
+   int16_t 			orientation_x;
+   int16_t			orientation_y;
    opentimers_id_t      orientationTimerId;  ///< periodic timer which triggers transmission
+   uint32_t 		anchor_measurement_time;
+   int32_t			anchor_measurement_phi;
+   int16_t			anchor_measurement_x;
+   int16_t			anchor_measurement_y;
+   uint8_t 			anchor_received;
        
 } localization_vars_t;
 

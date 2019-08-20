@@ -2607,7 +2607,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
             case 0x49:
             	//this is an orientation tuple eb
 
-
+            	//orientation size is length of orientation tuple struct
                 for(asdf = 0; asdf < (sublen)/ORIENTATION_SIZE;asdf++){
                     int byte = 0;
                     for(byte = 0; byte<ORIENTATION_SIZE; byte++){
@@ -2616,7 +2616,73 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                     }
                 }
                 localization_vars.orientation_received = 1;
+                //get location of this neighbor from neighbor table, which is automatically updated by IEs
+                //this should also be contained in the orientation EB eventually
+                neighbors_getLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
+                localization_vars.orientation_x = coordinates.x;
+                localization_vars.orientation_y = coordinates.y;
                 break;
+            
+            //anchor measurement eb
+            case 0x50:
+                //right now, i am just copying the orientation eb
+                for(asdf = 0; asdf < (sublen)/ORIENTATION_SIZE;asdf++){
+                    int byte = 0;
+                    for(byte = 0; byte<ORIENTATION_SIZE; byte++){
+                    	//plus 6 is to bypass the asn write in the beginning of the eb
+                        localization_vars.orientations_tmp[asdf].bytes[byte] = *(uint8_t*)((pkt->payload)+ptr+asdf*ORIENTATION_SIZE + byte + 6);
+                    }
+                }
+                //parse x and y from packet
+                union{
+                	int16_t val;
+                	uint8_t bytes[2];
+                } anchor_x;
+                union{
+                	int16_t val;
+                	uint8_t bytes[2];
+                } anchor_y;
+
+                anchor_x.bytes[1] = *(uint8_t*)((pkt->payload)+ptr+ 6);
+                anchor_x.bytes[0] = *(uint8_t*)((pkt->payload)+ptr+1+ 6);
+
+                anchor_y.bytes[1] = *(uint8_t*)((pkt->payload)+ptr+ 2 + 6);
+                anchor_y.bytes[0] = *(uint8_t*)((pkt->payload)+ptr+ 3 + 6);
+
+                //update localization app with anchor coordinates
+                localization_vars.anchor_measurement_x = anchor_x.val;
+                localization_vars.anchor_measurement_y = anchor_y.val;
+
+                //parse time
+                union{
+                	int32_t val;
+                	uint8_t bytes[4];
+
+                }phi;
+
+                phi.bytes[3] = *(uint8_t*)((pkt->payload)+ptr + 4 + 6);
+                phi.bytes[2] = *(uint8_t*)((pkt->payload)+ptr + 5 + 6);
+                phi.bytes[1] = *(uint8_t*)((pkt->payload)+ptr + 6 + 6);
+                phi.bytes[0] = *(uint8_t*)((pkt->payload)+ptr + 7 + 6);
+
+                localization_vars.anchor_measurement_phi = phi.val;
+
+                //parse phi
+                union {
+                	uint32_t val;
+                	uint8_t bytes[4];
+                }time;
+
+                time.bytes[3] = *(uint8_t*)((pkt->payload)+ptr + 8 + 6);
+                time.bytes[2] = *(uint8_t*)((pkt->payload)+ptr + 9 + 6);
+                time.bytes[1] = *(uint8_t*)((pkt->payload)+ptr + 10 + 6);
+                time.bytes[0] = *(uint8_t*)((pkt->payload)+ptr + 11 + 6);
+
+                localization_vars.anchor_measurement_time = time.val;
+                get_period_us_32(100,200);
+                localization_vars.anchor_received = 1;
+                break;
+
 
             default:
               //printf("unsupported iel\n");

@@ -606,6 +606,21 @@ void neighbors_setLocation(open_addr_t* l2_src,
 	}
 }
 
+void neighbors_getLocation(open_addr_t* l2_src, location_xyz_t* coordinates){
+	int i;
+	   for (i=0;i<MAXNUMNEIGHBORS;i++) {
+
+	      if (isThisRowMatching(l2_src,i)) {
+
+	         // whether the neighbor is considered as secure or not
+	    	 coordinates->x = neighbors_vars.neighbors[i].location.x;
+	    	 coordinates->y = neighbors_vars.neighbors[i].location.y;
+	    	 coordinates->z = neighbors_vars.neighbors[i].location.z;
+	      }
+	      return;
+	   }
+}
+
 void neighbors_setPreferredParent(uint8_t index, bool isPreferred){
     neighbors_vars.neighbors[index].parentPreference = isPreferred;
 }
