@@ -93,10 +93,7 @@ void compass_cal_lookup(void);
 void receive_cf_packet(void);
 
 //=========================== private vars ====================================
-#define MAG_CAL_SAMPLES 5
-#define PRINT 0
-#define CRAZYFLIE 1
-#define ANCHOR_MOTE 1
+
 
 typedef struct{
     int16_t x;
@@ -625,11 +622,10 @@ void orientation_lookup_task(void){
                        //print orientation and location in crazyflie lighthouse measurement format
                           
                       	//mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
-
-                        //if anchor, send eb to ligthouse robot
-                        if(ANCHOR_MOTE){
-                        	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,localization_vars.orientation_x,localization_vars.orientation_y);
-                        }
+                    }
+                    //if anchor, send eb to ligthouse robot
+                    if(ANCHOR_MOTE){
+                    	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,localization_vars.orientation_x,localization_vars.orientation_y);
                     }
 
                 }
@@ -668,6 +664,7 @@ void localization_task_cb(void) {
 		uint32_t time = (uint8_t) localization_vars.anchor_measurement_time;
 		int32_t phi = localization_vars.anchor_measurement_phi;
 		localization_vars.anchor_received = 0;
+		mimsyPrintf("anchor measurement received, x: %d, y: %d, phi: %d \n",localization_vars.anchor_measurement_x,localization_vars.anchor_measurement_y,localization_vars.anchor_measurement_phi);
 	}
     scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
 
@@ -709,7 +706,13 @@ void localization_task_cb(void) {
 
     //}
     calc_eulers(fquats, &roll, &pitch , &yaw);
-    localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(heading*1000); //in milliradians
+
+    //if attached to crazyflie, use crazyflie estimation of heading
+    if(CRAZYFLIE == 1){
+    	localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = localization_vars.crazyflie_heading;
+    }else{
+    	localization_vars.orientations[localization_vars.orientation_idx].fields.orientation = (int32_t)(heading*1000); //in milliradians
+    }
     localization_vars.orientations[localization_vars.orientation_idx].fields.time = curr_time; //save time
     localization_vars.orientation_idx++;
     if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N && LIGHTHOUSE_MOTE == 1){
@@ -966,6 +969,11 @@ void receive_cf_packet(void){
         phi.bytes[1] = packet[6];
         phi.bytes[2] = packet[7];
         phi.bytes[3] = packet[8];
+
+        //update mimsy state
+        localization_vars.crazyflie_heading = phi.val;
+        sixtop_vars.location.x = x.val;
+        sixtop_vars.location.y = y.val;
 
         //update locations with crazyflie state
         mimsyPrintf("Valid State Packet! x: %d, y: %d, phi: %d \n",x.val,y.val,phi.val);

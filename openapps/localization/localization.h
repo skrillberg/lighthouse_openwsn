@@ -30,8 +30,13 @@
 #define ORIENTATION_SAMPLE_N  10
 #define ORIENTATION_SIZE 8
 #define ORIENTATION_PERIOD_MS 100
+
 #define LIGHTHOUSE_MOTE 1
 #define LEGO_DRONE_MOUNT 0
+#define MAG_CAL_SAMPLES 5
+#define PRINT 0
+#define CRAZYFLIE 1
+#define ANCHOR_MOTE 0
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
@@ -76,6 +81,7 @@ typedef struct {
    int16_t			anchor_measurement_x;
    int16_t			anchor_measurement_y;
    uint8_t 			anchor_received;
+   int32_t			crazyflie_heading;
        
 } localization_vars_t;
 
