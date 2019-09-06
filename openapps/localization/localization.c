@@ -206,6 +206,13 @@ void localization_init(void) {
         mag_min_idx[i] = 0;
     }
     compass_cal_lookup();
+
+    //set constant location if nonmobile anchor mote
+    if (ANCHOR_MOTE && CRAZYFLIE == 0){
+    	sixtop_vars.location.x = ANCHOR_X;
+    	sixtop_vars.location.y = ANCHOR_Y;
+    }
+
 }
 
 void compass_cal_lookup(void){
@@ -467,22 +474,25 @@ void mimsy_GPIO_falling_edge_handler(void) {
     ieee154e_getAsn(sixtop_vars.sync_pulse_asn);
 
 
-        
-        sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;   
+	//calculate offset from asn to current time using 32 mhz timer. This var name is misleading
+	sixtop_vars.sync_pulse_timer_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
 
-
-        uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration 
+	//calculate current time in 32 mHz ticks: asn*slot_duration + intraslot_offest
+	uint32_t curr_time = sixtop_vars.sync_pulse_asn[3] * 16777216 * ieee154e_vars.slotDuration
                     + sixtop_vars.sync_pulse_asn[2] * 65536 * ieee154e_vars.slotDuration 
                     + sixtop_vars.sync_pulse_asn[1] * 256 * ieee154e_vars.slotDuration 
                     + sixtop_vars.sync_pulse_asn[0] * ieee154e_vars.slotDuration
                     + sixtop_vars.sync_pulse_timer_offset; 
-        if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0){
-            localization_vars.orientation_pulse_time = curr_time;
-            localization_vars.pulse_detected = 1;
-            if(PRINT){
-            	//mimsyPrintf("Pulse Detected \n");
-            }
-        }
+
+	//detect pulse, disregard pulses < 60 us because those are glitches or optitrak pulses, and robolighthouse scans
+	//should be slower than 60 us
+	if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0 && period > 60.0){
+		localization_vars.orientation_pulse_time = curr_time;
+		localization_vars.pulse_detected = 1;
+		if(PRINT){
+			//mimsyPrintf("Pulse Detected \n");
+		}
+	}
 }
 
 void localization_offset_timer_cb(opentimers_id_t id){
@@ -539,20 +549,21 @@ void orientation_timer_cb(opentimers_id_t id){
     scheduler_push_task(orientation_lookup_task,TASKPRIO_COAP);
 }
 void orientation_lookup_task(void){
-    //look for uart packets
-    receive_cf_packet();
-
+    //look for uart packets if connected to crazyflie
+	if(CRAZYFLIE){
+		receive_cf_packet();
+	}
     if(localization_vars.pulse_detected && localization_vars.orientation_received){
         uint8_t idx;
         uint8_t found;
         if(PRINT){
-        	//mimsyPrintf("Calculation State \n");
+        	mimsyPrintf("Pulse detected and eb received \n");
         }
         found = 0;
         for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
         	if(LIGHTHOUSE_MOTE == 0 && PRINT){
-        		mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[idx].fields.time,
-                                                localization_vars.orientations_tmp[idx].fields.orientation);
+        		//mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[idx].fields.time,
+                //                                localization_vars.orientations_tmp[idx].fields.orientation);
         	}
             //search for the nearest time in the table
             if(localization_vars.orientation_pulse_time > localization_vars.orientations_tmp[idx].fields.time && localization_vars.orientation_pulse_time < localization_vars.orientations_tmp[idx+1].fields.time){
@@ -617,7 +628,10 @@ void orientation_lookup_task(void){
                         crazypacket[14] = 122;
 
                         
-                        mimsyPrintf(crazypacket);
+                        for(int i = 0; i <15; i++){
+                        	uart_mimsy_writeByte(crazypacket[i]);
+                        }
+
                         
                        //print orientation and location in crazyflie lighthouse measurement format
                           
@@ -625,14 +639,17 @@ void orientation_lookup_task(void){
                     }
                     //if anchor, send eb to ligthouse robot
                     if(ANCHOR_MOTE){
-                    	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,localization_vars.orientation_x,localization_vars.orientation_y);
+                    	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,sixtop_vars.location.x,sixtop_vars.location.y);
+                    	if(PRINT){
+                    		mimsyPrintf("Anchor EB Sent \n");
+                    	}
                     }
 
                 }
             }
         }
         if(LIGHTHOUSE_MOTE == 0 && PRINT){
-        mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.time,
+        mimsyPrintf("Orientation Not Found: %d, %d \n",localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.time,
                                             localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.orientation);
         }
         localization_vars.pulse_detected = 0;
@@ -642,14 +659,19 @@ void orientation_lookup_task(void){
         }
         found = 0;
     }
+   /* else if(localization_vars.pulse_detected){
+        if(PRINT){
+        	mimsyPrintf("Pulse detected \n");
+        }
+    }*/
     else if(!localization_vars.pulse_detected && localization_vars.orientation_received){
     	localization_vars.orientation_received = 0; //clear flag since we got an orientation before we got a laser pulse
     	if(PRINT){
     		//mimsyPrintf("Orientation no Pulse \n");
             int edx;
             for(edx = 0; edx < ORIENTATION_SAMPLE_N; edx++ ){
-                mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[edx].fields.time,
-                                                    localization_vars.orientations_tmp[edx].fields.orientation);
+                //mimsyPrintf("Orientation No Pulse: %d, %d \n",localization_vars.orientations_tmp[edx].fields.time,
+                //                                    localization_vars.orientations_tmp[edx].fields.orientation);
             }
     	}
     }
@@ -661,10 +683,45 @@ void localization_task_cb(void) {
 	if(localization_vars.anchor_received){
 
 		//an orientation packet from anchor mote was received
-		uint32_t time = (uint8_t) localization_vars.anchor_measurement_time;
+		uint32_t time = localization_vars.anchor_measurement_time;
 		int32_t phi = localization_vars.anchor_measurement_phi;
 		localization_vars.anchor_received = 0;
-		mimsyPrintf("anchor measurement received, x: %d, y: %d, phi: %d \n",localization_vars.anchor_measurement_x,localization_vars.anchor_measurement_y,localization_vars.anchor_measurement_phi);
+		//mimsyPrintf("anchor measurement received, x: %d, y: %d, phi: %d \n",localization_vars.anchor_measurement_x,localization_vars.anchor_measurement_y,localization_vars.anchor_measurement_phi);
+
+        //create crazyflie lh packet
+		uint8_t crazypacket[15];
+        crazypacket[0] = 100; //preamble for lh packet type
+
+        //random number, i'll put length for now
+        crazypacket[1] = 'a';
+        //x location of measurer
+        crazypacket[2] = (localization_vars.anchor_measurement_x & 0xff00) >> 8;
+        crazypacket[3] = localization_vars.anchor_measurement_x & 0x00ff;
+
+        //y location of measurer
+        crazypacket[4] = (localization_vars.anchor_measurement_y & 0xff00) >> 8;
+        crazypacket[5] = localization_vars.anchor_measurement_y & 0x00ff;
+
+        //orientation: milliradians in int32
+        crazypacket[6] = (localization_vars.anchor_measurement_phi & 0xFF000000) >> 24;
+        crazypacket[7] = (localization_vars.anchor_measurement_phi & 0x00FF0000)>> 16;
+        crazypacket[8] = (localization_vars.anchor_measurement_phi & 0x0000FF00) >> 8;
+        crazypacket[9] = localization_vars.anchor_measurement_phi & 0xFF;
+
+        //time of pulse in openwsn asn time
+        crazypacket[10] = (localization_vars.anchor_measurement_time & 0xFF000000) >> 24;
+        crazypacket[11] = (localization_vars.anchor_measurement_time & 0xFF0000) >> 16;
+        crazypacket[12] = (localization_vars.anchor_measurement_time & 0xFF00) >> 8;
+        crazypacket[13] = localization_vars.anchor_measurement_time & 0xFF;
+
+        //end of frame byte
+        crazypacket[14] = 122;
+
+        for(int i = 0; i <15; i++){
+        	uart_mimsy_writeByte(crazypacket[i]);
+        }
+
+
 	}
     scheduleEntry_t* slot = schedule_getCurrentScheduleEntry();
 
@@ -946,13 +1003,13 @@ void receive_cf_packet(void){
     //receive the 10 uart bytes from packet
     packet[0] = byte;
     uint8_t count = 1;
-    while(byte && count <10){
-        mimsyPrintf("%c",byte);
+    while( count <10){
+        //mimsyPrintf("%c",byte);
         byte = uart_mimsy_readByte();
         packet[count] = byte;
         count++;
     }
-    mimsyPrintf("%c \n",byte);
+   // mimsyPrintf("%c \n",byte);
     
     //check for correct end flag from crazyflie
     if(byte!= 'z'){
@@ -976,7 +1033,7 @@ void receive_cf_packet(void){
         sixtop_vars.location.y = y.val;
 
         //update locations with crazyflie state
-        mimsyPrintf("Valid State Packet! x: %d, y: %d, phi: %d \n",x.val,y.val,phi.val);
+        //mimsyPrintf("Valid State Packet! x: %d, y: %d, phi: %d \n",x.val,y.val,phi.val);
     } 
 
 }
@@ -1156,67 +1213,7 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
                     sync_data.data[5] = (uint32_t) localization_vars.slope_sum/localization_vars.sync_cycle_count; 
                     sync_data.data[6] = (uint32_t) corrected_proj_sync;
                     sync_data.data[7] = (uint32_t) (((asn_pulses_local[i+1].rise - corrected_proj_sync)*GPT_TICKS_PER_SC_TICK) * sweep_velocity/32.0*1000);  
-                    //openserial_printData(sync_data.bytes, 32);
-                    
 
-                    /*
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) periods_from_ref,
-                         (errorparameter_t)0
-                    );
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) ((next_pulse.rise - curr_pulse.fall) * sweep_velocity/32.0 * 1000),
-                         (errorparameter_t)0
-                    );
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) (((asn_pulses_local[i+1].rise - proj_sync_fall)*GPT_TICKS_PER_SC_TICK) * sweep_velocity/32.0*1000),
-                         (errorparameter_t)0
-                    );
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) ((next_pulse.rise - curr_pulse.fall)/GPT_TICKS_PER_SC_TICK ),
-                         (errorparameter_t)0
-                    );
-
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) (((asn_pulses_local[i+1].rise - proj_sync_fall))),
-                         (errorparameter_t)0
-                    );
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) desync,
-                         (errorparameter_t)0
-                    );
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t)  proj_sync_fall,
-                         (errorparameter_t)0
-                    );
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t)  asn_pulses_local[i].fall,
-                         (errorparameter_t)0
-                    );
-
-                    openserial_printError(
-                         COMPONENT_localization,
-                         ERR_NO_FREE_PACKET_BUFFER,
-                         (errorparameter_t)(uint16_t) 11111,
-                         (errorparameter_t)0
-                    );
-                    */
                 }
 
                 break;
@@ -1237,47 +1234,10 @@ location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local) {
     }
 
     loc.valid = true;
-    sixtop_vars.location.x = loc.phi*1000;
-    sixtop_vars.location.y = loc.theta*1000;
-    sixtop_vars.location.z = loc.r_horiz*1000;
-    /*
-    openserial_printError(
-         COMPONENT_localization,
-         ERR_NO_FREE_PACKET_BUFFER,
-         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_asn[0]+ sixtop_vars.sync_pulse_asn[1]*256,
-         (errorparameter_t)0
-      );
-    openserial_printError(
-         COMPONENT_localization,
-         ERR_NO_FREE_PACKET_BUFFER,
-         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
-         (errorparameter_t)0
-      );
-    openserial_printError(
-         COMPONENT_localization,
-         ERR_NO_FREE_PACKET_BUFFER,
-         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
-         (errorparameter_t)0
-      );
-    openserial_printError(
-         COMPONENT_localization,
-         ERR_NO_FREE_PACKET_BUFFER,
-         (errorparameter_t)(uint16_t) sixtop_vars.sync_pulse_timer_offset,
-         (errorparameter_t)0
-      );
-    openserial_printError(
-         COMPONENT_localization,
-         ERR_NO_FREE_PACKET_BUFFER,
-         (errorparameter_t)(uint16_t) (sixtop_vars.sync_pulse_period*100),
-         (errorparameter_t)0
-      );
-    openserial_printError(
-         COMPONENT_localization,
-         ERR_NO_FREE_PACKET_BUFFER,
-         (errorparameter_t)11111,
-         (errorparameter_t)0
-      );
-        */
+    //sixtop_vars.location.x = loc.phi*1000;
+    //sixtop_vars.location.y = loc.theta*1000;
+    //sixtop_vars.location.z = loc.r_horiz*1000;
+
         uint16_t diff;
         if((uint16_t)sixtop_vars.ref_sync_pulse > (uint16_t)(sixtop_vars.current_sync_pulse_time*100)){
 

@@ -19,8 +19,12 @@ uint8_t uart_mimsy_readByte(void){
         i32Char = UARTCharGet(UART1_BASE);
 	    return (uint8_t)(i32Char & 0xFF);
      }else{
-        return 0;
+        return 255;
      }
+}
+
+void  uart_mimsy_writeByte(uint8_t byteToWrite){
+	UARTCharPut(UART1_BASE, byteToWrite);
 }
 
 void uartMimsyInit(){

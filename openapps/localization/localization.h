@@ -29,14 +29,16 @@
 #define GPT_TICKS_PER_SC_TICK 976.5625f
 #define ORIENTATION_SAMPLE_N  10
 #define ORIENTATION_SIZE 8
-#define ORIENTATION_PERIOD_MS 100
-
-#define LIGHTHOUSE_MOTE 1
+//#define ORIENTATION_PERIOD_MS 49
+#define ORIENTATION_PERIOD_MS 20
+#define LIGHTHOUSE_MOTE 0
 #define LEGO_DRONE_MOUNT 0
 #define MAG_CAL_SAMPLES 5
-#define PRINT 0
-#define CRAZYFLIE 1
-#define ANCHOR_MOTE 0
+#define PRINT 1
+#define CRAZYFLIE 0
+#define ANCHOR_MOTE 1
+#define ANCHOR_X 13
+#define ANCHOR_Y -794
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
