@@ -393,8 +393,8 @@ void input_edge_timers_init(void) {
 
     // NOTE: the TS3633-CM1 Prototyping Module inverts rising and falling edges when light pulses are received,
     // so negative edges correspond to rising edges, and positive edges correspond to falling edges
-    TimerControlEvent(gptmEdgeTimerBase, GPTIMER_A, GPTIMER_EVENT_NEG_EDGE); // set timer3a to capture rising edges (inverted by PCB)
-    TimerControlEvent(gptmEdgeTimerBase, GPTIMER_B, GPTIMER_EVENT_POS_EDGE); // set timer3b to capture falling edges (inverted by PCB)
+    TimerControlEvent(gptmEdgeTimerBase, GPTIMER_A, GPTIMER_EVENT_POS_EDGE); // set timer3a to capture rising edges (inverted by PCB)
+    TimerControlEvent(gptmEdgeTimerBase, GPTIMER_B, GPTIMER_EVENT_NEG_EDGE); // set timer3b to capture falling edges (inverted by PCB)
 
     TimerIntDisable(gptmEdgeTimerBase, gptmFallingEdgeEvent);
     TimerIntClear(gptmEdgeTimerBase, gptmFallingEdgeEvent);
@@ -486,7 +486,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
 	//detect pulse, disregard pulses < 60 us because those are glitches or optitrak pulses, and robolighthouse scans
 	//should be slower than 60 us
-	if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0 && period > 60.0){
+	if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0 && period > 200.0){
 		localization_vars.orientation_pulse_time = curr_time;
 		localization_vars.pulse_detected = 1;
 		if(PRINT){

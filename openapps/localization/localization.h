@@ -34,11 +34,11 @@
 #define LIGHTHOUSE_MOTE 0
 #define LEGO_DRONE_MOUNT 0
 #define MAG_CAL_SAMPLES 5
-#define PRINT 1
-#define CRAZYFLIE 0
-#define ANCHOR_MOTE 1
+#define PRINT 0
+#define CRAZYFLIE 1
+#define ANCHOR_MOTE 0
 #define ANCHOR_X 13
-#define ANCHOR_Y -794
+#define ANCHOR_Y 794
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
