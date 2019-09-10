@@ -1299,7 +1299,7 @@ port_INLINE void orientation_sendEB() {
     //reserve space for location IE. This should be before all other reserve
     //header operation because otherwise it will not be appended to the end of the IEs
 
-    uint16_t loc_len = 88;   //length is payload plus two bytes of descriptor stuff
+    uint16_t loc_len = 88+4;   //length is payload plus two bytes of descriptor stuff and 4 bytes for location
     packetfunctions_reserveHeaderSize(eb,loc_len); //undid to get working
     temp16b = IEEE802154E_DESC_TYPE_SHORT | 
               (0x49 << IEEE802154E_DESC_SUBID_SHORT_MLME_IE_SHIFT) | 
@@ -1314,7 +1314,7 @@ port_INLINE void orientation_sendEB() {
     (errorparameter_t)0
 );*/
 
-    uint8_t loc_stream[88]; //6 bytes in the beginning for asn
+    uint8_t loc_stream[88+4]; //6 bytes in the beginning for asn and 2 for x y and the end
 
     loc_stream[0] = (uint8_t)(temp16b & 0x00ff);
     loc_stream[1] = (uint8_t)((temp16b & 0xff00)>>8);
@@ -1326,7 +1326,13 @@ port_INLINE void orientation_sendEB() {
             loc_stream[8+tuple*size+byte] = localization_vars.orientations[tuple].bytes[byte];
         }
     }
+    //add x and y to location header
+    loc_stream[88] = (uint8_t) ((sixtop_vars.location.x >> 8) & 0x00FF);
+    loc_stream[89] = (uint8_t) ((sixtop_vars.location.x) & 0x00FF);
     
+    loc_stream[90] = (uint8_t) ((sixtop_vars.location.y >> 8) & 0x00FF);
+    loc_stream[91] = (uint8_t) ((sixtop_vars.location.y ) & 0x00FF) ;
+
 
     //load location header
     for (i=0;i<loc_len;i++){

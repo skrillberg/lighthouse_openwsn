@@ -2606,19 +2606,37 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                 break;
             case 0x49:
             	//this is an orientation tuple eb
-
+            	x=0;
+            	uint8_t idx = 0;
             	//orientation size is length of orientation tuple struct
-                for(asdf = 0; asdf < (sublen)/ORIENTATION_SIZE;asdf++){
+                for(asdf = 0; asdf < (sublen-4)/ORIENTATION_SIZE;asdf++){
                     int byte = 0;
+
+
                     for(byte = 0; byte<ORIENTATION_SIZE; byte++){
                     	//plus 6 is to bypass the asn write in the beginning of the eb
+                    	idx = asdf*ORIENTATION_SIZE + byte + 6;
                         localization_vars.orientations_tmp[asdf].bytes[byte] = *(uint8_t*)((pkt->payload)+ptr+asdf*ORIENTATION_SIZE + byte + 6);
+
                     }
+
                 }
                 localization_vars.orientation_received = 1;
                 //get location of this neighbor from neighbor table, which is automatically updated by IEs
                 //this should also be contained in the orientation EB eventually
-                neighbors_getLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
+                //neighbors_getLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
+                uint8_t point = sublen-4 + 6;
+                uint8_t upperx = *(uint8_t*)((pkt->payload)+ptr+idx+1);
+                uint8_t lowerx = *(uint8_t*)((pkt->payload)+ptr+idx +2);
+
+                uint8_t uppery = *(uint8_t*)((pkt->payload)+ptr+idx +3);
+                uint8_t lowery = *(uint8_t*)((pkt->payload)+ptr+idx+4);
+
+                //coordinates.x = (int16_t)  ((((uint16_t) upperx) <<8) || ((uint16_t) lowerx)) ;
+                coordinates.x = (int16_t)  (((uint16_t) upperx) <<8);
+
+                coordinates.x = (int16_t)  ((((uint16_t) upperx) <<8) | ((uint16_t) lowerx)) ;
+                coordinates.y = (int16_t)  ((((uint16_t) uppery) <<8) | ((uint16_t) lowery)) ;
                 localization_vars.orientation_x = coordinates.x;
                 localization_vars.orientation_y = coordinates.y;
                 break;
