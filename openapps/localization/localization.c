@@ -85,7 +85,7 @@ void mimsy_GPIO_falling_edge_handler(void);
 void calc_eulers(float * quats, euler_t * roll, euler_t * pitch, euler_t * yaw);
 location_t localize_mimsy(pulse_t *pulses_local, pulse_t *asn_pulses_local);
 #define GYRO_FSR			2000 //gyro full scale range in deg/s
-void orientation_sendEB(void);
+void orientation_sendEB(int16_t count);
 void anchor_sendEB(int phi, uint32_t time, int16_t x, int16_t y);
 void orientation_lookup_task(void);
 void orientation_timer_cb(opentimers_id_t id);
@@ -108,6 +108,7 @@ mag_t mag_max[MAG_CAL_SAMPLES];
 mag_t mag_min[MAG_CAL_SAMPLES];
 float heading; //heading in radians
 int32_t hard_mag_bias[3];
+static int16_t orientation_counter;
 //=========================== public ==========================================
 
 void localization_init(void) {
@@ -168,6 +169,7 @@ void localization_init(void) {
     unsigned long timestamp;
     uint16_t dur = ieee154e_getSlotDuration();
     uartMimsyInit(); //initial mimsy printf
+    orientation_counter = 0;
     //while(dmp_read_fifo((gyro), (accel), (quat),&(timestamp), &sensors, &more)!=0){
     //mimsyPrintf(" hello world \n");
 	//}
@@ -486,7 +488,7 @@ void mimsy_GPIO_falling_edge_handler(void) {
 
 	//detect pulse, disregard pulses < 60 us because those are glitches or optitrak pulses, and robolighthouse scans
 	//should be slower than 60 us
-	if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0 && period > 200.0){
+	if(localization_vars.orientation_received == 0 && localization_vars.pulse_detected ==0 && period > 250.0){
 		localization_vars.orientation_pulse_time = curr_time;
 		localization_vars.pulse_detected = 1;
 		if(PRINT){
@@ -552,12 +554,13 @@ void orientation_lookup_task(void){
     //look for uart packets if connected to crazyflie
 	if(CRAZYFLIE){
 		receive_cf_packet();
+
 	}
     if(localization_vars.pulse_detected && localization_vars.orientation_received){
         uint8_t idx;
         uint8_t found;
         if(PRINT){
-        	mimsyPrintf("Pulse detected and eb received \n");
+        	mimsyPrintf("Pulse detected and eb received state \n");
         }
         found = 0;
         for(idx = 0; idx < ORIENTATION_SAMPLE_N-1; idx++ ){
@@ -596,14 +599,24 @@ void orientation_lookup_task(void){
                     //orientation =  localization_vars.orientations_tmp[idx].fields.orientation;
                     found = 1;
                     if(PRINT){
-                    	mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
+                    	mimsyPrintf("Orientation (Time, phi, lighthouse x, lighthouse y): %d, %d, %d, %d  \n", localization_vars.orientation_pulse_time, orientation,localization_vars.orientation_x,localization_vars.orientation_y);
                     }
                     if (CRAZYFLIE){
                         //create crazyflie lh packet
                         crazypacket[0] = 100; //preamble for lh packet type
+                        uint8_t asn[5];
+                        ieee154e_getAsn(asn);
+                        uint32_t asn_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
 
-                        //random number, i'll put length for now
-                        crazypacket[1] = 'a';
+                        //random number, current_time vs pulse time
+                        uint32_t curr_time = asn[3] * 16777216 * ieee154e_vars.slotDuration
+                                    + asn[2] * 65536 * ieee154e_vars.slotDuration
+                                    + asn[1] * 256 * ieee154e_vars.slotDuration
+                                    + asn[0] * ieee154e_vars.slotDuration
+                                    + asn_offset;
+
+                        crazypacket[1] = (uint8_t) ( ((curr_time - localization_vars.anchor_measurement_time)/320) & 0xFF ); //ticks of 10ms
+
                         //x location of measurer
                         crazypacket[2] = (localization_vars.orientation_x & 0xff00) >> 8;
                         crazypacket[3] = localization_vars.orientation_x & 0x00ff;
@@ -638,8 +651,13 @@ void orientation_lookup_task(void){
                       	//mimsyPrintf("Orientation: %d, %d \n", localization_vars.orientation_pulse_time, orientation);
                     }
                     //if anchor, send eb to ligthouse robot
-                    if(ANCHOR_MOTE){
+                    if(ANCHOR_MOTE && !CRAZYFLIE){
                     	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,sixtop_vars.location.x,sixtop_vars.location.y);
+                    	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,sixtop_vars.location.x,sixtop_vars.location.y);
+                    	anchor_sendEB(orientation,localization_vars.orientation_pulse_time,sixtop_vars.location.x,sixtop_vars.location.y);
+                    	//anchor_sendEB(orientation,localization_vars.orientation_pulse_time,sixtop_vars.location.x,sixtop_vars.location.y);
+                    	//anchor_sendEB(orientation,localization_vars.orientation_pulse_time,sixtop_vars.location.x,sixtop_vars.location.y);
+
                     	if(PRINT){
                     		mimsyPrintf("Anchor EB Sent \n");
                     	}
@@ -647,15 +665,17 @@ void orientation_lookup_task(void){
 
                 }
             }
+
         }
+
         if(LIGHTHOUSE_MOTE == 0 && PRINT){
-        mimsyPrintf("Orientation Not Found: %d, %d \n",localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.time,
-                                            localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.orientation);
+        //mimsyPrintf("Orientation Not Found: %d, %d \n",localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.time,
+         //                                   localization_vars.orientations_tmp[ORIENTATION_SAMPLE_N-1].fields.orientation);
         }
         localization_vars.pulse_detected = 0;
         localization_vars.orientation_received = 0;
         if(PRINT){
-        	//mimsyPrintf("Calculation State Exited; Found: %d \n",found);
+        	mimsyPrintf("Calculation State Exited; Found: %d \n",found);
         }
         found = 0;
     }
@@ -691,9 +711,19 @@ void localization_task_cb(void) {
         //create crazyflie lh packet
 		uint8_t crazypacket[15];
         crazypacket[0] = 100; //preamble for lh packet type
+        uint8_t asn[5];
+        ieee154e_getAsn(asn);
+        uint32_t asn_offset =  opentimers_getValue()-ieee154e_vars.startOfSlotReference;
 
-        //random number, i'll put length for now
-        crazypacket[1] = 'a';
+        //random number, i'll put last byte of time offest
+        uint32_t curr_time = asn[3] * 16777216 * ieee154e_vars.slotDuration
+                    + asn[2] * 65536 * ieee154e_vars.slotDuration
+                    + asn[1] * 256 * ieee154e_vars.slotDuration
+                    + asn[0] * ieee154e_vars.slotDuration
+                    + asn_offset;
+
+
+        crazypacket[1] = (uint8_t) ( ((curr_time - localization_vars.anchor_measurement_time)/320) & 0xFF ); //ticks of 10ms
         //x location of measurer
         crazypacket[2] = (localization_vars.anchor_measurement_x & 0xff00) >> 8;
         crazypacket[3] = localization_vars.anchor_measurement_x & 0x00ff;
@@ -774,7 +804,11 @@ void localization_task_cb(void) {
     localization_vars.orientation_idx++;
     if(localization_vars.orientation_idx >= ORIENTATION_SAMPLE_N && LIGHTHOUSE_MOTE == 1){
        localization_vars.orientation_idx = 0;
-        orientation_sendEB();
+        orientation_sendEB(orientation_counter);
+        orientation_sendEB(orientation_counter);
+        orientation_sendEB(orientation_counter);
+        //orientation_sendEB(orientation_counter);
+       orientation_counter++;
     }
 
  
@@ -1033,7 +1067,9 @@ void receive_cf_packet(void){
         sixtop_vars.location.y = y.val;
 
         //update locations with crazyflie state
-        //mimsyPrintf("Valid State Packet! x: %d, y: %d, phi: %d \n",x.val,y.val,phi.val);
+        if(PRINT){
+        	mimsyPrintf("State x: %d, y: %d, phi: %d \n",x.val,y.val,phi.val);
+        }
     } 
 
 }
@@ -1270,7 +1306,7 @@ This is one of the MAC management tasks. This function inlines in the
 timers_res_fired() function, but is declared as a separate function for better
 readability of the code.
 */
-port_INLINE void orientation_sendEB() {
+port_INLINE void orientation_sendEB(int16_t count) {
     OpenQueueEntry_t* eb;
     uint8_t     i;
     uint8_t     eb_len;
@@ -1330,9 +1366,14 @@ port_INLINE void orientation_sendEB() {
     loc_stream[88] = (uint8_t) ((sixtop_vars.location.x >> 8) & 0x00FF);
     loc_stream[89] = (uint8_t) ((sixtop_vars.location.x) & 0x00FF);
     
-    loc_stream[90] = (uint8_t) ((sixtop_vars.location.y >> 8) & 0x00FF);
-    loc_stream[91] = (uint8_t) ((sixtop_vars.location.y ) & 0x00FF) ;
-
+    //if we aren't sending a count for diagnostics
+    if (count == -1){
+		loc_stream[90] = (uint8_t) ((sixtop_vars.location.y >> 8) & 0x00FF);
+		loc_stream[91] = (uint8_t) ((sixtop_vars.location.y ) & 0x00FF) ;
+    }else{
+		loc_stream[90] = (uint8_t) ((count >> 8) & 0x00FF);
+		loc_stream[91] = (uint8_t) ((count ) & 0x00FF) ;
+    }
 
     //load location header
     for (i=0;i<loc_len;i++){

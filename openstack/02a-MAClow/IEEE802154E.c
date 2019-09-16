@@ -2622,6 +2622,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
 
                 }
                 localization_vars.orientation_received = 1;
+
                 //get location of this neighbor from neighbor table, which is automatically updated by IEs
                 //this should also be contained in the orientation EB eventually
                 //neighbors_getLocation(&(pkt->l2_nextORpreviousHop),&coordinates);
@@ -2639,6 +2640,7 @@ bool isValidEbFormat(OpenQueueEntry_t* pkt, uint16_t* lenIE){
                 coordinates.y = (int16_t)  ((((uint16_t) uppery) <<8) | ((uint16_t) lowery)) ;
                 localization_vars.orientation_x = coordinates.x;
                 localization_vars.orientation_y = coordinates.y;
+                //mimsyPrintf("Eb Received, Tx Number: %d\n",coordinates.y);
                 break;
             
             //anchor measurement eb

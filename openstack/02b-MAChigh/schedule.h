@@ -18,7 +18,7 @@
 The superframe reappears over time and can be arbitrarily long.
 */
 //#define SLOTFRAME_LENGTH    105 //should be 101
-#define SLOTFRAME_LENGTH    20 //should be 101
+#define SLOTFRAME_LENGTH    21 //should be 101
 //draft-ietf-6tisch-minimal-06
 #define SCHEDULE_MINIMAL_6TISCH_ACTIVE_CELLS                      14
 #define SCHEDULE_MINIMAL_6TISCH_SLOTOFFSET                        0

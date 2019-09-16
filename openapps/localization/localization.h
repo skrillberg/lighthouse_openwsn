@@ -31,14 +31,54 @@
 #define ORIENTATION_SIZE 8
 //#define ORIENTATION_PERIOD_MS 49
 #define ORIENTATION_PERIOD_MS 20
-#define LIGHTHOUSE_MOTE 0
+
+
+
+//enumeration of drone type (LIGHTHOUSE, ANCHOR, ANCHOR_ROBOT)
+#define LIGHTHOUSE
+
+//anchor location for anchor motes
+#define ANCHOR_LEFT //which anchor is being programmed (ANCHOR_RIGHT, ANCHOR_LEFT)
+
 #define LEGO_DRONE_MOUNT 0
 #define MAG_CAL_SAMPLES 5
-#define PRINT 0
-#define CRAZYFLIE 1
-#define ANCHOR_MOTE 0
-#define ANCHOR_X 13
-#define ANCHOR_Y 794
+
+
+//anchor conditionals
+#ifdef ANCHOR_RIGHT
+	#define ANCHOR_X (13-1829)
+	#define ANCHOR_Y 469
+#endif
+
+#ifdef ANCHOR_LEFT
+	#define ANCHOR_X (15-1829)
+	#define ANCHOR_Y -366
+#endif
+
+
+
+//drone type related conditional defines
+#ifdef LIGHTHOUSE
+	#define LIGHTHOUSE_MOTE 1
+	#define CRAZYFLIE 1
+	#define ANCHOR_MOTE 0
+	#define PRINT 0
+#endif
+
+#ifdef ANCHOR
+	#define LIGHTHOUSE_MOTE 0
+	#define CRAZYFLIE 0
+	#define ANCHOR_MOTE 1
+	#define PRINT 0
+#endif
+
+#ifdef ANCHOR_ROBOT
+	#define LIGHTHOUSE_MOTE 0
+	#define CRAZYFLIE 1
+	#define ANCHOR_MOTE 1
+	#define PRINT 1
+#endif
+
 //=========================== typedef =========================================
 
 //=========================== variables =======================================
